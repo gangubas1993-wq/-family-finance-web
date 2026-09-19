@@ -35,6 +35,29 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div id="loginErr" class="error hidden" style="margin-top:12px">Неверный пароль.</div>
 </div>
 
+<script>
+(function(){
+  try {
+    var hash = window.location.hash.replace(/^#/, "");
+    var params = new URLSearchParams(hash);
+    var token = params.get("token");
+    if (token) {
+      sessionStorage.setItem("ff_token", token);
+      history.replaceState(null, "", window.location.pathname);
+      var login = document.getElementById("login");
+      var app = document.getElementById("app");
+      if (login) login.classList.add("hidden");
+      if (app) app.classList.remove("hidden");
+    }
+    if (sessionStorage.getItem("ff_token")) {
+      var login2 = document.getElementById("login");
+      var app2 = document.getElementById("app");
+      if (login2) login2.classList.add("hidden");
+      if (app2) app2.classList.remove("hidden");
+    }
+  } catch (e) {}
+})();
+</script>
 <div id="app" class="hidden">
 <div class="topbar"><div class="wrap top">
 <div><div class="brand">Семейные финансы</div><div class="muted" id="updated">Загрузка…</div></div>
