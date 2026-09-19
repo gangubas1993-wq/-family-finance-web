@@ -44,7 +44,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div id="status" class="status"></div>
 
 <h2>💰 Баланс</h2><div id="totals" class="grid kpi"></div>
-<h2>💳 Счета</h2><div id="accounts" class="grid accounts"></div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">💳 Счета</h2><button class="btn primary" onclick="openAccountCreate()">＋ Счёт</button></div><div id="accounts" class="grid accounts" style="margin-top:12px"></div>
 <h2>📊 Текущий месяц</h2><div id="month"></div>
 
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">🧾 Операции</h2><button class="btn primary" onclick="openCreate()">＋ Добавить операцию</button></div>
@@ -68,6 +68,19 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 </div>
 <div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web теперь также позволяет добавлять, редактировать и удалять операции.</div>
 </main></div>
+
+<div id="accountModal" class="modal" onclick="closeAccountModal(event)"><div class="modal-card" onclick="event.stopPropagation()">
+<div class="modal-head"><div><div class="label" id="accountModalLabel">Новый счёт</div><h3 id="accountModalTitle" style="margin:4px 0 0">Счёт</h3></div><button class="btn" onclick="closeAccountModal()">✕</button></div>
+<div id="accountFormError" class="error hidden" style="margin-top:12px"></div>
+<div class="formgrid">
+<div class="field"><label>Название</label><input id="aName" type="text" placeholder="Например: Наличные TRY"></div>
+<div class="field"><label>Валюта</label><select id="aCurrency"><option value="TRY">TRY</option><option value="RUB">RUB</option></select></div>
+<div class="field"><label>Тип</label><select id="aKind"><option value="cash">Наличные</option><option value="bank">Банк / карта</option><option value="other">Другое</option></select></div>
+<div class="field"><label>Начальный баланс</label><input id="aOpening" type="number" step="0.01" placeholder="0"></div>
+</div>
+<div class="field"><label>Комментарий</label><textarea id="aNotes" rows="3" placeholder="Необязательно"></textarea></div>
+<div class="form-actions"><div></div><div class="right-actions"><button class="btn" onclick="closeAccountModal()">Отмена</button><button class="btn primary" onclick="saveAccount()">Сохранить</button></div></div>
+</div></div>
 
 <div id="modal" class="modal" onclick="closeModal(event)"><div class="modal-card" onclick="event.stopPropagation()">
 <div class="modal-head"><div><div class="label" id="modalLabel">Новая операция</div><h3 id="modalTitle" style="margin:4px 0 0">Расход</h3></div><button class="btn" onclick="closeModal()">✕</button></div>
@@ -147,7 +160,12 @@ async function api(path,opts={}){const r=await fetch(API+path,{...opts,headers:{
 async function load(){try{const d=await api("/dashboard");render(d)}catch(e){$("status").className="error";$("status").textContent="Ошибка загрузки: "+e.message}}
 function render(d){DATA=d;$("updated").textContent="Обновлено: "+new Date().toLocaleString("ru-RU");$("status").className="status";$("status").textContent=(d.family?.name||"Семейные финансы")+" · TRY и RUB";
 const t=d.totals||{};$("totals").innerHTML=card("Всего TRY",fmt(t.TRY,"TRY"),"по всем счетам")+card("Всего RUB",fmt(t.RUB,"RUB"),"по всем счетам")+card("Операций",String((d.structure||[]).find(x=>x.label==="Операции")?.value||0),"в базе");
-$("accounts").innerHTML=(d.accounts||[]).map(a=>'<div class="card"><div class="account-name">'+esc(a.name)+'<span class="pill">'+esc(a.currency)+'</span></div><div class="value '+(Number(a.balance)<0?"bad":"")+'">'+esc(fmt(a.balance,a.currency))+'</div><div class="sub">'+esc(a.kind==="cash"?"💵 Наличные":"💳 Карта / банк")+'</div></div>').join("");
+$("accounts").innerHTML=(d.allAccounts||d.accounts||[]).map(a=>{
+  const active=(a.is_active!==false), live=(d.accounts||[]).find(x=>x.id===a.id), balance=live?live.balance:Number(a.opening_balance||0);
+  return '<div class="card" style="'+(active?"":"opacity:.58")+'"><div class="account-name">'+esc(a.name)+'<span class="pill">'+esc(a.currency)+'</span>'+(active?"":"<span class=\"pill\">Отключён</span>")+'</div><div class="value '+(Number(balance)<0?"bad":"")+'">'+esc(fmt(balance,a.currency))+'</div><div class="sub">'+esc(a.kind==="cash"?"💵 Наличные":a.kind==="bank"?"💳 Карта / банк":"🏦 Другое")+'</div><div class="actions" style="margin-top:12px"><button class="btn" data-account-edit="'+esc(a.id)+'">Изменить</button><button class="btn" data-account-toggle="'+esc(a.id)+'">'+(active?"Отключить":"Включить")+'</button></div></div>';
+}).join("");
+document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("click",()=>openAccountEdit(b.dataset.accountEdit)));
+document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle)));
 const m=d.month||{};let mh='<div class="grid month">'+card("Расходы TRY",fmt(m.expense?.TRY,"TRY"),"текущий месяц")+card("Доходы TRY",fmt(m.income?.TRY,"TRY"),"текущий месяц")+card("Расходы RUB",fmt(m.expense?.RUB,"RUB"),"текущий месяц")+card("Доходы RUB",fmt(m.income?.RUB,"RUB"),"текущий месяц")+'</div>';const cats=m.categories||[];if(cats.length){const max=Math.max(...cats.map(x=>Number(x.amount||0)),1);mh+='<div class="card" style="margin-top:14px"><div class="label">Распределение расходов</div>'+cats.map(x=>'<div style="margin:12px 0"><div class="barhead"><span>'+esc(x.category)+'</span><b>'+esc(fmt(x.amount,x.currency))+'</b></div><div class="bar"><span style="width:'+Math.max(3,Math.round(Number(x.amount||0)/max*100))+'%"></span></div></div>').join("")+'</div>'}$("month").innerHTML=mh;
 fillFilters(d);renderOps();$("structure").innerHTML=(d.structure||[]).map(x=>'<div class="card"><div class="value">'+esc(x.value)+'</div><div class="label">'+esc(x.label)+'</div></div>').join("");$("categoryList").innerHTML=(d.categoryStructure||[]).map(x=>'<div class="struct-cat"><div><b>'+esc(x.name)+'</b><div class="muted">'+esc((x.aliases||[]).slice(0,8).join(", "))+'</div></div><div class="pill">'+esc(String(x.aliasCount||0))+'</div></div>').join("");$("aliasList").innerHTML=(d.topAliases||[]).map(x=>'<div class="struct-cat"><span>'+esc(x.alias)+'</span><span class="muted">→ '+esc(x.category)+'</span></div>').join("")}
 function fillFilters(d){$("fAccount").innerHTML='<option value="">Все счета</option>'+(d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");$("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+"</option>").join("");["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).oninput=renderOps)}
@@ -166,6 +184,34 @@ function renderOps(){
 function populateAccounts(currency,fromId="",toId=""){const ac=(DATA.accounts||[]).filter(a=>a.currency===currency);$("oAccount").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oFrom").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oTo").innerHTML=(DATA.accounts||[]).map(a=>'<option value="'+a.id+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");if(fromId)$("oFrom").value=fromId;if(toId)$("oTo").value=toId}
 function populateCategories(type,selected=""){const cs=(DATA.allCategories||[]).filter(c=>c.kind==="both"||c.kind===type);$("oCategory").innerHTML=cs.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join("");if(selected)$("oCategory").value=selected}
 function refreshForm(){const type=$("oType").value,currency=$("oCurrency").value;$("modalTitle").textContent=type==="expense"?"Расход":type==="income"?"Доход":"Перевод";$("expenseIncomeFields").classList.toggle("hidden",type==="transfer");$("transferFields").classList.toggle("hidden",type!=="transfer");if(type==="expense"||type==="income"){populateAccounts(currency,$("oAccount").value);populateCategories(type,$("oCategory").value);$("accountLabel").textContent=type==="expense"?"Счёт списания":"Счёт зачисления"}else{populateAccounts(currency,$("oFrom").value,$("oTo").value)}}
+let currentAccountId=null;
+function openAccountCreate(){
+  currentAccountId=null;$("accountModalLabel").textContent="Новый счёт";$("accountModalTitle").textContent="Счёт";
+  $("aName").value="";$("aCurrency").value="TRY";$("aKind").value="cash";$("aOpening").value="0";$("aNotes").value="";
+  $("accountFormError").classList.add("hidden");$("accountModal").classList.add("open");
+}
+function openAccountEdit(id){
+  const a=(DATA?.allAccounts||[]).find(x=>x.id===id);if(!a)return;
+  currentAccountId=id;$("accountModalLabel").textContent="Редактирование";$("accountModalTitle").textContent=a.name;
+  $("aName").value=a.name;$("aCurrency").value=a.currency;$("aKind").value=a.kind;$("aOpening").value=a.opening_balance;$("aNotes").value=a.notes||"";
+  $("accountFormError").classList.add("hidden");$("accountModal").classList.add("open");
+}
+function closeAccountModal(e){if(e&&e.target!==$("accountModal"))return;$("accountModal").classList.remove("open")}
+async function saveAccount(){
+  try{
+    $("accountFormError").classList.add("hidden");
+    const body={id:currentAccountId,name:$("aName").value.trim(),currency:$("aCurrency").value,kind:$("aKind").value,opening_balance:Number($("aOpening").value||0),notes:$("aNotes").value.trim()};
+    await api(currentAccountId?"/account/update":"/account/create",{method:"POST",body:JSON.stringify(body)});
+    closeAccountModal();await load();
+  }catch(e){$("accountFormError").textContent=e.message;$("accountFormError").classList.remove("hidden")}
+}
+async function toggleAccount(id){
+  const a=(DATA?.allAccounts||[]).find(x=>x.id===id);if(!a)return;
+  if(!confirm((a.is_active?"Отключить":"Включить")+" счёт «"+a.name+"»?"))return;
+  try{await api("/account/toggle",{method:"POST",body:JSON.stringify({id})});await load()}
+  catch(e){alert(e.message)}
+}
+
 function openCreate(){currentId=null;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";refreshForm();$("formError").classList.add("hidden");$("modal").classList.add("open")}
 function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.remove("hidden");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
 function closeModal(e){if(e&&e.target!==$("modal"))return;$("modal").classList.remove("open")}
