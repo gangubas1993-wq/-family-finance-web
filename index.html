@@ -28,8 +28,10 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <body>
 <div id="login" class="login">
 <h1>Семейные финансы</h1><div class="muted">Веб-интерфейс</div>
-<input id="secret" type="password" autocomplete="current-password" placeholder="Пароль доступа">
-<button class="btn primary" style="width:100%" onclick="login()">Войти</button>
+<form method="post" action="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api/login">
+<input name="secret" id="secret" type="password" autocomplete="current-password" placeholder="Пароль доступа" required>
+<button class="btn primary" type="submit" style="width:100%">Войти</button>
+</form>
 <div id="loginErr" class="error hidden" style="margin-top:12px">Неверный пароль.</div>
 </div>
 
@@ -102,7 +104,23 @@ const fmt=(n,c)=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format
 const dateKey=s=>{if(!s)return"";const p=s.split(".");return p.length===3?p[2]+"-"+p[1]+"-"+p[0]:s};
 const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
 function card(l,v,s){return'<div class="card"><div class="label">'+esc(l)+'</div><div class="value">'+esc(v)+'</div><div class="sub">'+esc(s||"")+'</div></div>'}
-async function login(){try{const r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({secret:$("secret").value})});const d=await r.json();if(!r.ok)throw new Error();sessionStorage.setItem("ff_token",d.token);$("login").classList.add("hidden");$("app").classList.remove("hidden");load()}catch{$("loginErr").classList.remove("hidden")}}
+function initAuth(){
+  const params=new URLSearchParams(location.search);
+  if(params.get("login")==="bad") $("loginErr").classList.remove("hidden");
+
+  const hash=new URLSearchParams(location.hash.replace(/^#/,""));
+  const token=hash.get("token");
+  if(token){
+    sessionStorage.setItem("ff_token",token);
+    history.replaceState(null,"",location.pathname+location.search);
+  }
+
+  if(sessionStorage.getItem("ff_token")){
+    $("login").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    load();
+  }
+}
 function logout(){sessionStorage.removeItem("ff_token");location.reload()}
 async function api(path,opts={}){const r=await fetch(API+path,{...opts,headers:{Authorization:"Bearer "+(sessionStorage.getItem("ff_token")||""),"Content-Type":"application/json",...(opts.headers||{})},cache:"no-store"});const d=await r.json().catch(()=>({}));if(r.status===401){logout();throw new Error("Сессия истекла")}if(!r.ok)throw new Error(d.error||("HTTP "+r.status));return d}
 async function load(){try{const d=await api("/dashboard");render(d)}catch(e){$("status").className="error";$("status").textContent="Ошибка загрузки: "+e.message}}
@@ -124,4 +142,5 @@ async function saveOperation(){try{$("formError").classList.add("hidden");const 
 await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить операцию?"))return;try{await api("/operation/delete",{method:"POST",body:JSON.stringify({id:currentId})});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
+initAuth();
 </script></body></html>
