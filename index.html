@@ -186,15 +186,23 @@ async function api(path,opts={}){
 }
 async function load(retry=0){
  try{
-  $("status").textContent="Загрузка...";
+  $("status").className="status";
+  $("status").textContent="Загрузка основных данных...";
   const d=await api("/dashboard");
-  const extras=await Promise.allSettled([api("/dictionary"),api("/recurring/list")]);
-  for(const x of extras)if(x.status==="fulfilled")Object.assign(d,x.value);
-  DATA=d;render(d);
+  DATA=d;
+  render(d);
+  $("status").textContent="Данные загружены";
+  // Дополнительные разделы не должны блокировать основной экран.
+  Promise.allSettled([api("/dictionary"),api("/recurring/list")]).then(results=>{
+    let changed=false;
+    for(const x of results)if(x.status==="fulfilled"){Object.assign(DATA,x.value);changed=true}
+    if(changed)render(DATA);
+  });
  }catch(e){
   const msg=String(e&&e.message||e);
   if(retry<1&&/JWT issued at future/i.test(msg)){setTimeout(()=>load(retry+1),1500);return}
-  $("status").className="error";$("status").textContent="Ошибка загрузки: "+msg;
+  $("status").className="error";
+  $("status").textContent="Ошибка загрузки: "+msg;
  }
 }
 function render(d){DATA=d;$("updated").textContent="Обновлено: "+new Date().toLocaleString("ru-RU");$("status").className="status";$("status").textContent=(d.family?.name||"Семейные финансы")+" · TRY и RUB";
