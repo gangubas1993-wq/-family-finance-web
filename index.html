@@ -45,8 +45,8 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <h2>💳 Счета</h2><div id="accounts" class="grid accounts"></div>
 <h2>📊 Текущий месяц</h2><div id="month"></div>
 
-<h2>🧾 Операции</h2>
-<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">🧾 Операции</h2><button class="btn primary" onclick="openCreate()">＋ Добавить операцию</button></div>
+<div class="card" style="margin-top:12px">
 <div class="filters">
 <select id="fType"><option value="">Все типы</option><option value="expense">Расходы</option><option value="income">Доходы</option><option value="transfer">Переводы</option></select>
 <select id="fCurrency"><option value="">Все валюты</option><option value="TRY">TRY</option><option value="RUB">RUB</option></select>
