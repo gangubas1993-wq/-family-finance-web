@@ -57,7 +57,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <input id="fFrom" type="date"><input id="fTo" type="date">
 <div class="filter-actions"><input id="fSearch" placeholder="Поиск по операции..."><button class="btn" onclick="clearFilters()">Сбросить</button></div>
 </div>
-<div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Категория / перевод</th><th>Счёт</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody id="ops"></tbody></table></div>
+<div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Курс</th><th>Категория / перевод</th><th>Счёт</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody id="ops"></tbody></table></div>
 <div class="muted" id="opCount" style="margin-top:10px"></div>
 </div>
 
@@ -232,10 +232,10 @@ function renderOps(){
  $("opCount").textContent="Показано: "+os.length+" из "+(DATA?.operations||[]).length;
  $("ops").innerHTML=os.map(o=>{
    const typ=o.type==="expense"?'<span class="bad">Расход</span>':o.type==="income"?'<span class="good">Доход</span>':"Перевод";
-   const amount=(o.type==="expense"?"−":o.type==="income"?"+":"")+fmt(o.amount,o.currency)+(o.type==="transfer"&&o.destination_amount!=null?" → "+fmt(o.destination_amount,o.to_currency||""):"");
+   const amount=(o.type==="expense"?"−":o.type==="income"?"+":"")+fmt(o.amount,o.currency)+(o.type==="transfer"&&o.destination_amount!=null?" → "+fmt(o.destination_amount,o.to_currency||""):""); const rate=o.type==="transfer"&&o.exchange_rate!=null?String(Number(o.exchange_rate).toFixed(8)).replace(/0+$/,"").replace(/\\.$/,"")+" "+esc(o.to_currency||"")+"/"+esc(o.currency):"—";
    const target=o.type==="transfer"?esc((o.from||"—")+" → "+(o.to||"—")):esc(o.category||"Без категории");
-   return '<tr><td>'+esc(o.date)+'</td><td>'+typ+'</td><td>'+esc(amount)+'</td><td>'+target+'</td><td>'+esc(o.account||"")+'</td><td>'+esc(o.comment||"")+'</td><td><button class="btn" data-op-id="'+esc(o.id)+'">Изменить</button></td></tr>';
- }).join("")||'<tr><td colspan="7" class="muted">По фильтрам ничего не найдено.</td></tr>';
+   return '<tr><td>'+esc(o.date)+'</td><td>'+typ+'</td><td>'+esc(amount)+'</td><td>'+esc(rate)+'</td><td>'+target+'</td><td>'+esc(o.account||"")+'</td><td>'+esc(o.comment||"")+'</td><td><button class="btn" data-op-id="'+esc(o.id)+'">Изменить</button></td></tr>';
+ }).join("")||'<tr><td colspan="8" class="muted">По фильтрам ничего не найдено.</td></tr>';
  document.querySelectorAll("[data-op-id]").forEach(btn=>btn.addEventListener("click",()=>openEdit(btn.dataset.opId)));
 }
 function populateAccounts(currency,fromId="",toId=""){const ac=(DATA.accounts||[]).filter(a=>a.currency===currency);$("oAccount").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oFrom").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oTo").innerHTML=(DATA.accounts||[]).map(a=>'<option value="'+a.id+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");if(fromId)$("oFrom").value=fromId;if(toId)$("oTo").value=toId}
