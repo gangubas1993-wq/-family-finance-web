@@ -105,7 +105,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div id="formError" class="error hidden" style="margin-top:12px"></div>
 <div class="formgrid">
 <div class="field"><label>Тип</label><select id="oType" onchange="refreshForm()"><option value="expense">Расход</option><option value="income">Доход</option><option value="transfer">Перевод</option></select></div>
-<div class="field"><label>Сумма</label><input id="oAmount" type="number" min="0" step="0.01" placeholder="0"></div>
+<div class="field"><label>Сумма отправления</label><input id="oAmount" type="number" min="0" step="0.01" placeholder="0" oninput="calcTransferFrom('amount')"></div>
 <div class="field"><label>Валюта</label><select id="oCurrency" onchange="refreshForm()"><option value="TRY">TRY</option><option value="RUB">RUB</option></select></div>
 <div class="field"><label>Дата</label><input id="oDate" type="date"></div>
 </div>
@@ -120,7 +120,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="field"><label>Откуда</label><select id="oFrom"></select></div>
 <div class="field"><label>Куда</label><select id="oTo"></select></div>
 </div>
-<div class="formgrid"><div class="field"><label>Сумма зачисления</label><input id="oDestinationAmount" type="number" min="0" step="0.01" placeholder="Для другой валюты"></div><div class="field"><label>Курс сделки (необязательно)</label><input id="oExchangeRate" type="number" min="0" step="0.00000001" placeholder="Можно указать курс"></div></div><div class="muted" style="margin-top:7px">Можно указать либо фактически полученную сумму, либо курс. Для межвалютного перевода обе суммы сохраняются, курс сделки фиксируется в операции.</div>
+<div class="formgrid"><div class="field"><label>Сумма зачисления</label><input id="oDestinationAmount" type="number" min="0" step="0.01" placeholder="Посчитается автоматически" oninput="calcTransferFrom('destination')"></div><div class="field"><label>Курс сделки</label><input id="oExchangeRate" type="number" min="0" step="0.00000001" placeholder="Посчитается автоматически" oninput="calcTransferFrom('rate')"></div></div><div class="muted" style="margin-top:7px">Введи любые <b>два из трёх</b>: сколько отдал, сколько получил, курс. Третье значение посчитается автоматически.</div>
 </div>
 <div class="field"><label>Комментарий</label><textarea id="oComment" rows="3" placeholder="Например: продукты, бензин, зарплата..."></textarea></div>
 <div class="form-actions"><div><button id="deleteBtn" class="btn danger hidden" onclick="deleteCurrent()">Удалить</button></div><div class="right-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn primary" onclick="saveOperation()">Сохранить</button></div></div>
@@ -240,7 +240,30 @@ function renderOps(){
 }
 function populateAccounts(currency,fromId="",toId=""){const ac=(DATA.accounts||[]).filter(a=>a.currency===currency);$("oAccount").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oFrom").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oTo").innerHTML=(DATA.accounts||[]).map(a=>'<option value="'+a.id+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");if(fromId)$("oFrom").value=fromId;if(toId)$("oTo").value=toId}
 function populateCategories(type,selected=""){const cs=(DATA.allCategories||[]).filter(c=>c.kind==="both"||c.kind===type);$("oCategory").innerHTML=cs.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join("");if(selected)$("oCategory").value=selected}
-function refreshForm(){const type=$("oType").value,currency=$("oCurrency").value;$("modalTitle").textContent=type==="expense"?"Расход":type==="income"?"Доход":"Перевод";$("expenseIncomeFields").classList.toggle("hidden",type==="transfer");$("transferFields").classList.toggle("hidden",type!=="transfer");if(type==="expense"||type==="income"){populateAccounts(currency,$("oAccount").value);populateCategories(type,$("oCategory").value);$("accountLabel").textContent=type==="expense"?"Счёт списания":"Счёт зачисления"}else{populateAccounts(currency,$("oFrom").value,$("oTo").value)}}
+function calcTransferFrom(source){
+  if($("oType").value!=="transfer")return;
+  const amount=Number($("oAmount").value)||0;
+  const destination=Number($("oDestinationAmount").value)||0;
+  const rate=Number($("oExchangeRate").value)||0;
+  if(source==="amount"&&amount>0&&rate>0)$("oDestinationAmount").value=(amount*rate).toFixed(2);
+  else if(source==="amount"&&amount>0&&destination>0)$("oExchangeRate").value=(destination/amount).toFixed(8);
+  else if(source==="destination"&&destination>0&&amount>0)$("oExchangeRate").value=(destination/amount).toFixed(8);
+  else if(source==="destination"&&destination>0&&rate>0)$("oAmount").value=(destination/rate).toFixed(2);
+  else if(source==="rate"&&rate>0&&amount>0)$("oDestinationAmount").value=(amount*rate).toFixed(2);
+  else if(source==="rate"&&rate>0&&destination>0)$("oAmount").value=(destination/rate).toFixed(2);
+  $("formError").classList.add("hidden");
+}
+function calcTransferCurrency(){
+  if($("oType").value!=="transfer")return;
+  const from=$("oFrom").value,to=$("oTo").value;
+  const a=(DATA?.accounts||[]).find(x=>x.id===from),b=(DATA?.accounts||[]).find(x=>x.id===to);
+  if(a&&b&&a.currency===b.currency){
+    const amount=Number($("oAmount").value)||0;
+    $("oExchangeRate").value=amount>0?"1":"";
+    $("oDestinationAmount").value=amount>0?amount:"";
+  }
+}
+function refreshForm(){const type=$("oType").value,currency=$("oCurrency").value;$("modalTitle").textContent=type==="expense"?"Расход":type==="income"?"Доход":"Перевод";$("expenseIncomeFields").classList.toggle("hidden",type==="transfer");$("transferFields").classList.toggle("hidden",type!=="transfer");if(type==="expense"||type==="income"){populateAccounts(currency,$("oAccount").value);populateCategories(type,$("oCategory").value);$("accountLabel").textContent=type==="expense"?"Счёт списания":"Счёт зачисления"}else{populateAccounts(currency,$("oFrom").value,$("oTo").value);setTimeout(()=>calcTransferCurrency(),0)}}
 let currentRecurringId=null;
 function renderRecurring(d){const rs=d.recurringPayments||[],ac=d.allAccounts||[],cats=d.categoryStructure||[];$("recurringList").innerHTML=rs.length?rs.map(r=>{const a=ac.find(x=>x.id===r.account_id),cat=cats.find(x=>x.id===r.category_id),freq={daily:"Ежедневно",weekly:"Еженедельно",monthly:"Ежемесячно",yearly:"Ежегодно"}[r.frequency]||r.frequency;return '<div class="card" style="'+(r.is_active?"":"opacity:.58")+'"><b>'+esc(r.name)+'</b> '+(r.is_active?"":"<span class=\"pill\">Отключён</span>")+'<div class="value">'+esc(fmt(r.amount,r.currency))+'</div><div class="sub">'+esc(freq)+' · следующая дата '+esc(r.next_run||"—")+(a?" · "+esc(a.name):"")+(cat?" · "+esc(cat.name):"")+'</div><div class="actions" style="margin-top:10px"><button class="btn" data-rec-edit="'+esc(r.id)+'">Изменить</button><button class="btn" data-rec-toggle="'+esc(r.id)+'">'+(r.is_active?"Отключить":"Включить")+'</button><button class="btn danger" data-rec-delete="'+esc(r.id)+'">Удалить</button></div></div>'}).join(""):'<div class="card muted">Регулярных платежей пока нет.</div>';document.querySelectorAll("[data-rec-edit]").forEach(b=>b.onclick=()=>openRecurringEdit(b.dataset.recEdit));document.querySelectorAll("[data-rec-toggle]").forEach(b=>b.onclick=()=>toggleRecurring(b.dataset.recToggle));document.querySelectorAll("[data-rec-delete]").forEach(b=>b.onclick=()=>deleteRecurring(b.dataset.recDelete))}
 function fillRecurringSelectors(aid,cid){$("rAccount").innerHTML='<option value="">Не выбран</option>'+(DATA?.allAccounts||[]).filter(a=>a.is_active!==false).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+'</option>').join("");$("rCategory").innerHTML='<option value="">Не выбрана</option>'+(DATA?.categoryStructure||[]).filter(x=>x.is_active!==false&&x.kind!=="income").map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");$("rAccount").value=aid||"";$("rCategory").value=cid||""}
