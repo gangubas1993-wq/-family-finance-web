@@ -219,7 +219,7 @@ const t=d.totals||{};$("totals").innerHTML=card("Всего TRY",fmt(t.TRY,"TRY"
   $("accounts").innerHTML=regular.map(render).join("")+(savings.length?'<div style="grid-column:1/-1;margin-top:6px"><h3 style="margin:8px 0 0">🏦 Накопления</h3></div>'+savings.map(render).join(""):"");
 })();
 document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("click",()=>openAccountEdit(b.dataset.accountEdit)));
-document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle));
+document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle)));
 document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("click",()=>openAccountEdit(b.dataset.accountEdit)));
 document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle)));
 const m=d.month||{};let mh='<div class="grid month">'+card("Расходы TRY",fmt(m.expense?.TRY,"TRY"),"текущий месяц")+card("Доходы TRY",fmt(m.income?.TRY,"TRY"),"текущий месяц")+card("Расходы RUB",fmt(m.expense?.RUB,"RUB"),"текущий месяц")+card("Доходы RUB",fmt(m.income?.RUB,"RUB"),"текущий месяц")+'</div>';const cats=m.categories||[];if(cats.length){const max=Math.max(...cats.map(x=>Number(x.amount||0)),1);mh+='<div class="card" style="margin-top:14px"><div class="label">Распределение расходов</div>'+cats.map(x=>'<div style="margin:12px 0"><div class="barhead"><span>'+esc(x.category)+'</span><b>'+esc(fmt(x.amount,x.currency))+'</b></div><div class="bar"><span style="width:'+Math.max(3,Math.round(Number(x.amount||0)/max*100))+'%"></span></div></div>').join("")+'</div>'}$("month").innerHTML=mh;
