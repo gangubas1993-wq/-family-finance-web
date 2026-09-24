@@ -207,10 +207,19 @@ async function load(retry=0){
 }
 function render(d){DATA=d;$("updated").textContent="Обновлено: "+new Date().toLocaleString("ru-RU");$("status").className="status";$("status").textContent=(d.family?.name||"Семейные финансы")+" · TRY и RUB";
 const t=d.totals||{};$("totals").innerHTML=card("Всего TRY",fmt(t.TRY,"TRY"),"по всем счетам")+card("Всего RUB",fmt(t.RUB,"RUB"),"по всем счетам")+card("Операций",String((d.structure||[]).find(x=>x.label==="Операции")?.value||0),"в базе");
-$("accounts").innerHTML=(d.allAccounts||d.accounts||[]).map(a=>{
-  const active=(a.is_active!==false), live=(d.accounts||[]).find(x=>x.id===a.id), balance=live?live.balance:Number(a.opening_balance||0);
-  return '<div class="card" style="'+(active?"":"opacity:.58")+'"><div class="account-name">'+esc(a.name)+'<span class="pill">'+esc(a.currency)+'</span>'+(active?"":"<span class=\"pill\">Отключён</span>")+'</div><div class="value '+(Number(balance)<0?"bad":"")+'">'+esc(fmt(balance,a.currency))+'</div><div class="sub">'+esc(a.kind==="cash"?"💵 Наличные":a.kind==="bank"?"💳 Карта / банк":"🏦 Другое")+'</div><div class="actions" style="margin-top:12px"><button class="btn" data-account-edit="'+esc(a.id)+'">Изменить</button><button class="btn" data-account-toggle="'+esc(a.id)+'">'+(active?"Отключить":"Включить")+'</button></div></div>';
-}).join("");
+(()=>{
+  const list=(d.allAccounts||d.accounts||[]);
+  const render=a=>{
+    const active=(a.is_active!==false), live=(d.accounts||[]).find(x=>x.id===a.id), balance=live?live.balance:Number(a.opening_balance||0);
+    const savings=(a.account_type==="savings"||a.kind==="savings");
+    return '<div class="card" style="'+(active?"":"opacity:.58")+'"><div class="account-name">'+esc(a.name)+'<span class="pill">'+esc(a.currency)+'</span>'+(savings?'<span class="pill">Накопления</span>':"")+(active?"":"<span class=\"pill\">Отключён</span>")+'</div><div class="value '+(Number(balance)<0?"bad":"")+'">'+esc(fmt(balance,a.currency))+'</div><div class="sub">'+esc(savings?"🏦 Накопления":a.kind==="cash"?"💵 Наличные":a.kind==="bank"?"💳 Карта / банк":"🏦 Другое")+'</div><div class="actions" style="margin-top:12px"><button class="btn" data-account-edit="'+esc(a.id)+'">Изменить</button><button class="btn" data-account-toggle="'+esc(a.id)+'">'+(active?"Отключить":"Включить")+'</button></div></div>';
+  };
+  const regular=list.filter(a=>!(a.account_type==="savings"||a.kind==="savings"));
+  const savings=list.filter(a=>(a.account_type==="savings"||a.kind==="savings"));
+  $("accounts").innerHTML=regular.map(render).join("")+(savings.length?'<div style="grid-column:1/-1;margin-top:6px"><h3 style="margin:8px 0 0">🏦 Накопления</h3></div>'+savings.map(render).join(""):"");
+})();
+document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("click",()=>openAccountEdit(b.dataset.accountEdit)));
+document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle));
 document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("click",()=>openAccountEdit(b.dataset.accountEdit)));
 document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle)));
 const m=d.month||{};let mh='<div class="grid month">'+card("Расходы TRY",fmt(m.expense?.TRY,"TRY"),"текущий месяц")+card("Доходы TRY",fmt(m.income?.TRY,"TRY"),"текущий месяц")+card("Расходы RUB",fmt(m.expense?.RUB,"RUB"),"текущий месяц")+card("Доходы RUB",fmt(m.income?.RUB,"RUB"),"текущий месяц")+'</div>';const cats=m.categories||[];if(cats.length){const max=Math.max(...cats.map(x=>Number(x.amount||0)),1);mh+='<div class="card" style="margin-top:14px"><div class="label">Распределение расходов</div>'+cats.map(x=>'<div style="margin:12px 0"><div class="barhead"><span>'+esc(x.category)+'</span><b>'+esc(fmt(x.amount,x.currency))+'</b></div><div class="bar"><span style="width:'+Math.max(3,Math.round(Number(x.amount||0)/max*100))+'%"></span></div></div>').join("")+'</div>'}$("month").innerHTML=mh;
