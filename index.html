@@ -38,12 +38,15 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div id="app" class="hidden">
 <div class="topbar"><div class="wrap top">
 <div><div class="brand">Семейные финансы</div><div class="muted" id="updated">Загрузка…</div></div>
-<div class="actions"><button class="btn" onclick="load()">↻ Обновить</button><button class="btn" onclick="openCreate()">＋ Операция</button><button class="btn" onclick="logout()">Выйти</button></div>
+<div class="actions"><button class="btn" onclick="showView('dashboard')">▦ Обзор</button><button class="btn" onclick="showView('admin')">⚙️ Управление</button><button class="btn" onclick="load()">↻ Обновить</button><button class="btn primary" onclick="openCreate()">＋ Операция</button><button class="btn" onclick="logout()">Выйти</button></div>
 </div></div>
 <main class="wrap">
 <div id="status" class="status"></div>
 
+<div id="dashboardView">
 <h2>💰 Баланс</h2><div id="totals" class="grid kpi"></div>
+<div id="adminView" class="hidden">
+<h2>⚙️ Управление системой</h2><div class="status">Здесь будут настройки семьи, справочники, доступ пользователей и технические параметры. Рабочий экран с балансом и операциями остаётся на «Обзоре».</div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">💳 Счета</h2><button class="btn primary" onclick="openAccountCreate()">＋ Счёт</button></div><div id="accounts" class="grid accounts" style="margin-top:12px"></div>
 <h2>📊 Текущий месяц</h2><div id="month"></div>
 
@@ -67,7 +70,9 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="card"><div class="label">Категории и словарь</div><div class="structure-list" id="categoryList"></div></div>
 <div class="card"><div class="label">Частые синонимы</div><div class="structure-list" id="aliasList"></div></div>
 </div>
-<div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web теперь также позволяет добавлять, редактировать и удалять операции.</div>
+<div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web также позволяет добавлять, редактировать и удалять операции.</div>
+</div>
+</div>
 </main></div>
 
 <div id="recurringModal" class="modal" onclick="closeRecurringModal(event)"><div class="modal-card" onclick="event.stopPropagation()"><div class="modal-head"><div><div class="label" id="recurringModalLabel">Новый платёж</div><h3 id="recurringModalTitle" style="margin:4px 0 0">Регулярный платёж</h3></div><button class="btn" onclick="closeRecurringModal()">✕</button></div><div id="recurringFormError" class="error hidden" style="margin-top:12px"></div><div class="formgrid"><div class="field"><label>Название</label><input id="rName" type="text" placeholder="Например: Аренда"></div><div class="field"><label>Сумма</label><input id="rAmount" type="number" min="0" step="0.01" placeholder="0"></div><div class="field"><label>Валюта</label><select id="rCurrency"><option value="TRY">TRY</option><option value="RUB">RUB</option></select></div><div class="field"><label>Периодичность</label><select id="rFrequency"><option value="monthly">Ежемесячно</option><option value="weekly">Еженедельно</option><option value="daily">Ежедневно</option><option value="yearly">Ежегодно</option></select></div><div class="field"><label>Следующая дата</label><input id="rNextRun" type="date"></div><div class="field"><label>Счёт списания</label><select id="rAccount"></select></div><div class="field"><label>Категория</label><select id="rCategory"></select></div></div><div class="field"><label>Комментарий</label><textarea id="rNotes" rows="3" placeholder="Необязательно"></textarea></div><div class="form-actions"><div></div><div class="right-actions"><button class="btn" onclick="closeRecurringModal()">Отмена</button><button class="btn primary" onclick="saveRecurring()">Сохранить</button></div></div></div></div>
@@ -331,5 +336,15 @@ async function saveOperation(){try{$("formError").classList.add("hidden");const 
 await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить операцию?"))return;try{await api("/operation/delete",{method:"POST",body:JSON.stringify({id:currentId})});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
+function showView(view){
+  const dashboard=$("dashboardView"), ops=$("dashboardOperations"), admin=$("adminView");
+  if(view==="admin"){
+    dashboard.classList.add("hidden"); ops.classList.add("hidden"); admin.classList.remove("hidden");
+  }else{
+    dashboard.classList.remove("hidden"); ops.classList.remove("hidden"); admin.classList.add("hidden");
+  }
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+showView("dashboard");
 initAuth();
 </script></body></html>
