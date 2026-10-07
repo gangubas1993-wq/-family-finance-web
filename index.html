@@ -45,9 +45,6 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 
 <div id="dashboardView">
 <h2>💰 Баланс</h2><div id="totals" class="grid kpi"></div>
-<div id="adminView" class="hidden">
-<h2>⚙️ Управление системой</h2><div class="status">Здесь будут настройки семьи, справочники, доступ пользователей и технические параметры. Рабочий экран с балансом и операциями остаётся на «Обзоре».</div>
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">💳 Счета</h2><button class="btn primary" onclick="openAccountCreate()">＋ Счёт</button></div><div id="accounts" class="grid accounts" style="margin-top:12px"></div>
 <h2>📊 Текущий месяц</h2><div id="month"></div>
 
 <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">🧾 Операции</h2><button class="btn primary" onclick="openCreate()">＋ Добавить операцию</button></div>
@@ -63,18 +60,31 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Курс</th><th>Категория / перевод</th><th>Счёт</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody id="ops"></tbody></table></div>
 <div class="muted" id="opCount" style="margin-top:10px"></div>
 </div>
-
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">🔁 Регулярные платежи</h2><button class="btn primary" onclick="openRecurringCreate()">＋ Платёж</button></div><div id="recurringList" class="grid" style="margin-top:12px"></div>
-<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">🗂 Структура</h2><button class="btn primary" onclick="openCategoryCreate()">＋ Категория</button></div><div id="structure" class="grid structure"></div>
-<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:14px">
-<div class="card"><div class="label">Категории и словарь</div><div class="structure-list" id="categoryList"></div></div>
-<div class="card"><div class="label">Частые синонимы</div><div class="structure-list" id="aliasList"></div></div>
-</div>
 <div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web также позволяет добавлять, редактировать и удалять операции.</div>
 </div>
-</div>
-</main></div>
 
+<div id="adminView" class="hidden">
+<h2>⚙️ Управление системой</h2>
+<div class="status">Отдельный экран для настроек семьи, справочников и доступа. На первом экране эти разделы больше не мешают работе с балансом и операциями.</div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">💳 Счета</h2><button class="btn primary" onclick="openAccountCreate()">＋ Счёт</button></div>
+<div id="accounts" class="grid accounts" style="margin-top:12px"></div>
+
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px"><h2 style="margin:0">🗂 Категории и синонимы</h2><button class="btn primary" onclick="openCategoryCreate()">＋ Категория</button></div>
+<div class="grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+<div class="card"><div class="label">Категории</div><div class="structure-list" id="categoryList"></div></div>
+<div class="card"><div class="label">Синонимы</div><div class="structure-list" id="aliasList"></div></div>
+</div>
+
+<div class="card" style="margin-top:14px"><div class="label">Структура</div><div id="structure" class="grid structure" style="margin-top:10px"></div></div>
+
+<h2>👨‍👩‍👧 Семья и доступ</h2>
+<div class="card"><b>Пользователи семьи</b><div class="sub" style="margin-top:6px">Здесь будет подключение супруги и управление тем, что ей доступно. Следующий этап — подключение второго пользователя к той же семье и проверка общих данных.</div></div>
+
+<h2>🔁 Регулярные операции</h2>
+<div class="card"><b>Будет добавлено позже</b><div class="sub" style="margin-top:6px">Регулярные операции предусмотрены в архитектуре, но сейчас не используются и не занимают место на рабочем экране.</div><div id="recurringList" class="hidden"></div></div>
+</div>
+</main>
 <div id="recurringModal" class="modal" onclick="closeRecurringModal(event)"><div class="modal-card" onclick="event.stopPropagation()"><div class="modal-head"><div><div class="label" id="recurringModalLabel">Новый платёж</div><h3 id="recurringModalTitle" style="margin:4px 0 0">Регулярный платёж</h3></div><button class="btn" onclick="closeRecurringModal()">✕</button></div><div id="recurringFormError" class="error hidden" style="margin-top:12px"></div><div class="formgrid"><div class="field"><label>Название</label><input id="rName" type="text" placeholder="Например: Аренда"></div><div class="field"><label>Сумма</label><input id="rAmount" type="number" min="0" step="0.01" placeholder="0"></div><div class="field"><label>Валюта</label><select id="rCurrency"><option value="TRY">TRY</option><option value="RUB">RUB</option></select></div><div class="field"><label>Периодичность</label><select id="rFrequency"><option value="monthly">Ежемесячно</option><option value="weekly">Еженедельно</option><option value="daily">Ежедневно</option><option value="yearly">Ежегодно</option></select></div><div class="field"><label>Следующая дата</label><input id="rNextRun" type="date"></div><div class="field"><label>Счёт списания</label><select id="rAccount"></select></div><div class="field"><label>Категория</label><select id="rCategory"></select></div></div><div class="field"><label>Комментарий</label><textarea id="rNotes" rows="3" placeholder="Необязательно"></textarea></div><div class="form-actions"><div></div><div class="right-actions"><button class="btn" onclick="closeRecurringModal()">Отмена</button><button class="btn primary" onclick="saveRecurring()">Сохранить</button></div></div></div></div>
 <div id="categoryModal" class="modal" onclick="closeCategoryModal(event)"><div class="modal-card" onclick="event.stopPropagation()">
 <div class="modal-head"><div><div class="label" id="categoryModalLabel">Новая категория</div><h3 id="categoryModalTitle" style="margin:4px 0 0">Категория</h3></div><button class="btn" onclick="closeCategoryModal()">✕</button></div>
