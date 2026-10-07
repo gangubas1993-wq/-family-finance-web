@@ -347,11 +347,11 @@ await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:
 async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить операцию?"))return;try{await api("/operation/delete",{method:"POST",body:JSON.stringify({id:currentId})});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
 function showView(view){
-  const dashboard=$("dashboardView"), ops=$("dashboardOperations"), admin=$("adminView");
+  const dashboard=$("dashboardView"), admin=$("adminView");
   if(view==="admin"){
-    dashboard.classList.add("hidden"); ops.classList.add("hidden"); admin.classList.remove("hidden");
+    dashboard.classList.add("hidden"); admin.classList.remove("hidden");
   }else{
-    dashboard.classList.remove("hidden"); ops.classList.remove("hidden"); admin.classList.add("hidden");
+    dashboard.classList.remove("hidden"); admin.classList.add("hidden");
   }
   window.scrollTo({top:0,behavior:"smooth"});
 }
