@@ -38,7 +38,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div id="app" class="hidden">
 <div class="topbar"><div class="wrap top">
 <div><div class="brand">Семейные финансы</div><div class="muted" id="updated">Загрузка…</div></div>
-<div class="actions"><button class="btn" onclick="showView('dashboard')">▦ Обзор</button><button class="btn" onclick="showView('admin')">⚙️ Управление</button><button class="btn" onclick="load()">↻ Обновить</button><button class="btn primary" onclick="openCreate()">＋ Операция</button><button class="btn" onclick="logout()">Выйти</button></div>
+<div class="actions"><button class="btn" onclick="showView('dashboard')">▦ Обзор</button><button id="adminNav" class="btn" onclick="showView('admin')">⚙️ Управление</button><button class="btn" onclick="load()">↻ Обновить</button><button class="btn primary" onclick="openCreate()">＋ Операция</button><button class="btn" onclick="logout()">Выйти</button></div>
 </div></div>
 <main class="wrap">
 <div id="status" class="status"></div>
@@ -60,7 +60,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Курс</th><th>Категория / перевод</th><th>Счёт</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody id="ops"></tbody></table></div>
 <div class="muted" id="opCount" style="margin-top:10px"></div>
 </div>
-<div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web также позволяет добавлять, редактировать и удалять операции.</div>
+<div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web позволяет добавлять и редактировать операции.</div>
 </div>
 
 <div id="adminView" class="hidden">
@@ -164,13 +164,26 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 </script>
 <script>
 const API="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api";
-let DATA=null,currentId=null;
+let DATA=null,currentId=null,ROLE="owner";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=(n,c)=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(Number(n||0))+" "+c;
 const dateKey=s=>{if(!s)return"";const p=s.split(".");return p.length===3?p[2]+"-"+p[1]+"-"+p[0]:s};
 const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
 function card(l,v,s){return'<div class="card"><div class="label">'+esc(l)+'</div><div class="value">'+esc(v)+'</div><div class="sub">'+esc(s||"")+'</div></div>'}
+function detectRole(){
+  try{
+    const token=sessionStorage.getItem("ff_token")||"";
+    const parts=token.split(".");
+    const identity=parts.length===3?parts[1]:"";
+    ROLE=identity==="owner"?"owner":identity.startsWith("member:")?"member":"owner";
+  }catch(e){ROLE="owner"}
+}
+function applyRoleUI(){
+  detectRole();
+  const adminNav=$("adminNav");
+  if(adminNav)adminNav.classList.toggle("hidden",ROLE!=="owner");
+}
 function initAuth(){
   const params=new URLSearchParams(location.search);
   if(params.get("login")==="bad") $("loginErr").classList.remove("hidden");
@@ -183,6 +196,8 @@ function initAuth(){
   }
 
   if(sessionStorage.getItem("ff_token")){
+    detectRole();
+    applyRoleUI();
     $("login").classList.add("hidden");
     $("app").classList.remove("hidden");
     load();
@@ -205,6 +220,8 @@ async function load(retry=0){
   $("status").textContent="Загрузка основных данных...";
   const d=await api("/dashboard");
   DATA=d;
+  detectRole();
+  applyRoleUI();
   render(d);
   $("status").textContent="Данные загружены";
   // Дополнительные разделы не должны блокировать основной экран.
@@ -340,7 +357,7 @@ async function toggleAccount(id){
 }
 
 function openCreate(){currentId=null;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";$("oDestinationAmount").value="";$("oExchangeRate").value="";refreshForm();$("formError").classList.add("hidden");$("modal").classList.add("open")}
-function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.remove("hidden");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id;$("oDestinationAmount").value=o.destination_amount??"";$("oExchangeRate").value=o.exchange_rate??""},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
+function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.toggle("hidden",ROLE!=="owner");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id;$("oDestinationAmount").value=o.destination_amount??"";$("oExchangeRate").value=o.exchange_rate??""},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
 function closeModal(e){if(e&&e.target!==$("modal"))return;$("modal").classList.remove("open")}
 async function saveOperation(){try{$("formError").classList.add("hidden");const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim()};if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}else{body.account_from_id=$("oFrom").value;body.account_to_id=$("oTo").value;const destination=Number($("oDestinationAmount").value)||0;const rate=Number($("oExchangeRate").value)||0;body.destination_amount=destination||undefined;body.exchange_rate=rate||undefined}
 await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
@@ -348,6 +365,7 @@ async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить 
 function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
 function showView(view){
   const dashboard=$("dashboardView"), admin=$("adminView");
+  if(view==="admin" && ROLE!=="owner") view="dashboard";
   if(view==="admin"){
     dashboard.classList.add("hidden"); admin.classList.remove("hidden");
   }else{
