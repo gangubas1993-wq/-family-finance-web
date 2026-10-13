@@ -66,4 +66,52 @@ with tempfile.TemporaryDirectory() as tmp:
             print(result.stderr, end="")
             raise SystemExit(result.returncode)
         print(f"PASS inline JavaScript syntax #{index}")
-print(f"All {len(required) + len(parser.scripts)} release smoke checks passed.")
+import json
+import re
+import urllib.error
+import urllib.request
+
+api_match = re.search(r'const API="(https://[^"]+)"', html)
+if not api_match:
+    raise SystemExit("FAIL could not locate HTTPS API URL")
+api = api_match.group(1)
+
+def request_status(path, method="GET"):
+    data = b"{}" if method == "POST" else None
+    request = urllib.request.Request(
+        api + path,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status, response.read()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read()
+
+try:
+    status, body = request_status("")
+    health = json.loads(body.decode("utf-8"))
+    ok = status == 200 and health.get("status") == "healthy"
+    print(f'{"PASS" if ok else "FAIL"} live API health endpoint ({status})')
+    if not ok:
+        raise SystemExit("Live API health check failed")
+
+    protected_routes = [
+        ("GET", "/dashboard"),
+        ("POST", "/operation/create"),
+        ("POST", "/operation/delete"),
+        ("POST", "/account/create"),
+        ("POST", "/category/create"),
+    ]
+    for method, path in protected_routes:
+        status, _ = request_status(path, method)
+        ok = status == 401
+        print(f'{"PASS" if ok else "FAIL"} unauthenticated {method} {path} rejected ({status})')
+        if not ok:
+            raise SystemExit(f"Expected HTTP 401 for unauthenticated {method} {path}, got {status}")
+except (TimeoutError, OSError, urllib.error.URLError) as error:
+    raise SystemExit(f"Live API smoke check failed: {error}")
+
+print(f"All {len(required) + len(parser.scripts) + 6} release smoke checks passed.")
