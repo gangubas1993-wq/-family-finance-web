@@ -100,10 +100,24 @@ try:
 
     protected_routes = [
         ("GET", "/dashboard"),
+        ("GET", "/dictionary"),
+        ("GET", "/recurring/list"),
         ("POST", "/operation/create"),
+        ("POST", "/operation/update"),
         ("POST", "/operation/delete"),
         ("POST", "/account/create"),
+        ("POST", "/account/update"),
+        ("POST", "/account/toggle"),
         ("POST", "/category/create"),
+        ("POST", "/category/update"),
+        ("POST", "/category/toggle"),
+        ("POST", "/alias/create"),
+        ("POST", "/alias/update"),
+        ("POST", "/alias/toggle"),
+        ("POST", "/recurring/create"),
+        ("POST", "/recurring/update"),
+        ("POST", "/recurring/toggle"),
+        ("POST", "/recurring/delete"),
     ]
     for method, path in protected_routes:
         status, _ = request_status(path, method)
@@ -114,4 +128,4 @@ try:
 except (TimeoutError, OSError, urllib.error.URLError) as error:
     raise SystemExit(f"Live API smoke check failed: {error}")
 
-print(f"All {len(required) + len(parser.scripts) + 6} release smoke checks passed.")
+print(f"All {len(required) + len(parser.scripts) + 1 + len(protected_routes)} release smoke checks passed.")
