@@ -164,7 +164,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 </script>
 <script>
 const API="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api";
-let DATA=null,currentId=null,ROLE="owner";
+let DATA=null,currentId=null,ROLE="member";
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=(n,c)=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(Number(n||0))+" "+c;
@@ -176,8 +176,8 @@ function detectRole(){
     const token=sessionStorage.getItem("ff_token")||"";
     const parts=token.split(".");
     const identity=parts.length===3?parts[1]:"";
-    ROLE=identity==="owner"?"owner":identity.startsWith("member:")?"member":"owner";
-  }catch(e){ROLE="owner"}
+    ROLE=identity==="owner"?"owner":identity.startsWith("member:")?"member":"member";
+  }catch(e){ROLE="member"}
 }
 function applyRoleUI(){
   detectRole();
