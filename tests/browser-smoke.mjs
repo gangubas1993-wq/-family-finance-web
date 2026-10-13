@@ -16,6 +16,7 @@ async function openPage(role, viewport) {
  const page=await context.newPage(); const writes=[];\n const browserErrors=[]; page.on("pageerror",e=>browserErrors.push(String(e))); page.on("console",m=>{if(m.type()==="error")browserErrors.push(m.text())});
  await page.route("**/functions/v1/family-finance-dashboard-api**",async route=>{
   const req=route.request(),u=new URL(req.url()),path=u.pathname.split("/family-finance-dashboard-api").pop()||"/";
+  if(req.method()==="OPTIONS") return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization,content-type","Access-Control-Allow-Methods":"GET,POST,OPTIONS"}});
   if(req.method()==="GET"&&path==="/dashboard") return route.fulfill({status:200,json:fixture});
   if(req.method()==="GET"&&path==="/dictionary") return route.fulfill({status:200,json:{allAccounts:fixture.allAccounts,categoryStructure:fixture.categoryStructure,allCategories:fixture.allCategories,topAliases:[],structure:fixture.structure}});
   if(req.method()==="GET"&&path==="/recurring/list") return route.fulfill({status:200,json:{recurringPayments:[]}});
