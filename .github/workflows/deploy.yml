@@ -29,6 +29,14 @@ jobs:
           python-version: "3.x"
       - name: Validate web client and inline JavaScript
         run: python scripts/validate_web.py
+      - name: Install browser test tools
+        run: npm install --no-save --package-lock=false playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Start local static site
+        run: python -m http.server 4173 --directory . >/tmp/web.log 2>&1 & sleep 2
+      - name: Run isolated browser smoke tests
+        run: node tests/browser-smoke.mjs
 
   deploy:
     if: github.event_name != 'pull_request'
