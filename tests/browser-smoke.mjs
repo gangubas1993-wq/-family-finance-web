@@ -72,7 +72,7 @@ async function openIsolatedPage(role, viewport) {
 
   const token = role === "owner" ? "test.owner.signature" : "test.member:test.signature";
   await page.goto((process.env.SMOKE_BASE_URL || "http://127.0.0.1:4173/") + "#token=" + encodeURIComponent(token));
-  await page.getByText("Данные загружены").waitFor({ timeout: 10000 });
+  await page.waitForFunction(() => document.querySelector("#totals")?.innerText.includes("Всего TRY"), null, { timeout: 10000 });
   return { context, page, interceptedWrites };
 }
 
