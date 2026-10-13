@@ -176,7 +176,7 @@ function detectRole(){
     const token=sessionStorage.getItem("ff_token")||"";
     const parts=token.split(".");
     const identity=parts.length===3?parts[1]:"";
-    ROLE=identity==="owner"?"owner":identity.startsWith("member:")?"member":"member";
+    ROLE=identity==="owner"?"owner":"member";
   }catch(e){ROLE="member"}
 }
 function applyRoleUI(){
