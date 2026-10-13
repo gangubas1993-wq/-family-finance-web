@@ -13,7 +13,7 @@ const fixture = {
 };
 async function openPage(role, viewport) {
  const context=await browser.newContext({viewport});
- const page=await context.newPage(); const writes=[];
+ const page=await context.newPage(); const writes=[];\n const browserErrors=[]; page.on("pageerror",e=>browserErrors.push(String(e))); page.on("console",m=>{if(m.type()==="error")browserErrors.push(m.text())});
  await page.route("**/functions/v1/family-finance-dashboard-api**",async route=>{
   const req=route.request(),u=new URL(req.url()),path=u.pathname.split("/family-finance-dashboard-api").pop()||"/";
   if(req.method()==="GET"&&path==="/dashboard") return route.fulfill({status:200,json:fixture});
