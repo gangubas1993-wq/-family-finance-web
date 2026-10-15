@@ -119,6 +119,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="modal-head"><div><div class="label" id="modalLabel">Новая операция</div><h3 id="modalTitle" style="margin:4px 0 0">Расход</h3></div><button class="btn" onclick="closeModal()">✕</button></div>
 <div id="formError" class="error hidden" style="margin-top:12px"></div>
 <div id="balanceWarning" class="error hidden" style="margin-top:12px"></div>
+<div id="historicalModeWrap" class="note hidden" style="margin-top:12px"><label style="display:flex;gap:9px;align-items:flex-start;color:inherit;font-size:14px"><input id="historicalMode" type="checkbox" style="margin-top:4px;flex:0 0 auto"><span><b>Историческая операция</b><br><span class="muted" style="color:inherit">Для внесения старых расходов и переводов. Проверка остатка будет предупреждать, но не блокировать запись. Использовать только для операций, реально совершённых в прошлом.</span></span></label></div>
 <div class="formgrid">
 <div class="field"><label>Тип</label><select id="oType" onchange="refreshForm()"><option value="expense">Расход</option><option value="income">Доход</option><option value="transfer">Перевод</option></select></div>
 <div class="field"><label>Сумма отправления</label><input id="oAmount" type="number" min="0" step="0.01" placeholder="0" oninput="calcTransferFrom('amount')"></div>
@@ -306,6 +307,8 @@ function calcTransferCurrency(){
   }
 }
 function updateBalanceWarning(){
+ const historical=$("historicalModeWrap");
+ if(historical)historical.classList.toggle("hidden",ROLE!=="owner");
  const type=$("oType").value;
  const amount=Number($("oAmount").value)||0;
  const accountId=type==="transfer"?$("oFrom").value:$("oAccount").value;
@@ -319,7 +322,7 @@ function updateBalanceWarning(){
    if(old && (old.type==="expense"||old.type==="transfer") && old.from_account_id===accountId) available+=Number(old.amount||0);
  }
  if(amount>available+0.000001){
-   warning.textContent="Недостаточно средств на счёте «"+account.name+"». Доступно: "+fmt(available,account.currency)+". Операция не будет сохранена.";
+   warning.textContent="Недостаточно средств на счёте «"+account.name+"». Доступно: "+fmt(available,account.currency)+(ROLE==="owner"&&$("historicalMode")?.checked?". Исторический режим разрешит запись с отрицательным остатком.":" . Операция не будет сохранена.");
    warning.classList.remove("hidden");
  }else{
    warning.classList.add("hidden");warning.textContent="";
@@ -377,10 +380,10 @@ async function toggleAccount(id){
   catch(e){alert(e.message)}
 }
 
-function openCreate(){currentId=null;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";$("oDestinationAmount").value="";$("oExchangeRate").value="";refreshForm();$("formError").classList.add("hidden");updateBalanceWarning();$("modal").classList.add("open")}
+function openCreate(){currentId=null;$("historicalMode").checked=false;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";$("oDestinationAmount").value="";$("oExchangeRate").value="";refreshForm();$("formError").classList.add("hidden");updateBalanceWarning();$("modal").classList.add("open")}
 function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.toggle("hidden",ROLE!=="owner");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id;$("oDestinationAmount").value=o.destination_amount??"";$("oExchangeRate").value=o.exchange_rate??""},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
 function closeModal(e){if(e&&e.target!==$("modal"))return;$("modal").classList.remove("open")}
-async function saveOperation(){try{$("formError").classList.add("hidden");updateBalanceWarning();if(!$("balanceWarning").classList.contains("hidden"))throw new Error($("balanceWarning").textContent);const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim()};if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}else{body.account_from_id=$("oFrom").value;body.account_to_id=$("oTo").value;const destination=Number($("oDestinationAmount").value)||0;const rate=Number($("oExchangeRate").value)||0;body.destination_amount=destination||undefined;body.exchange_rate=rate||undefined}
+async function saveOperation(){try{$("formError").classList.add("hidden");updateBalanceWarning();const historical=ROLE==="owner"&&$("historicalMode").checked;if(!$("balanceWarning").classList.contains("hidden")&&!historical)throw new Error($("balanceWarning").textContent);const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim(),historical_mode:historical};if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}else{body.account_from_id=$("oFrom").value;body.account_to_id=$("oTo").value;const destination=Number($("oDestinationAmount").value)||0;const rate=Number($("oExchangeRate").value)||0;body.destination_amount=destination||undefined;body.exchange_rate=rate||undefined}
 await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить операцию?"))return;try{await api("/operation/delete",{method:"POST",body:JSON.stringify({id:currentId})});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
@@ -394,7 +397,7 @@ function showView(view){
   }
   window.scrollTo({top:0,behavior:"smooth"});
 }
-$("oAmount").addEventListener("input",updateBalanceWarning);$("oAccount").addEventListener("change",updateBalanceWarning);$("oFrom").addEventListener("change",updateBalanceWarning);$("oType").addEventListener("change",updateBalanceWarning);
+$("historicalMode").addEventListener("change",updateBalanceWarning);$("oAmount").addEventListener("input",updateBalanceWarning);$("oAccount").addEventListener("change",updateBalanceWarning);$("oFrom").addEventListener("change",updateBalanceWarning);$("oType").addEventListener("change",updateBalanceWarning);
 showView("dashboard");
 initAuth();
 </script></body></html>
