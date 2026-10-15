@@ -20,6 +20,8 @@ DECLARE
   v_destination_amount numeric := nullif(p_payload->>'destination_amount','')::numeric;
   v_opening numeric;
   v_balance numeric;
+  v_source_currency text;
+  v_destination_currency text;
   v_id uuid;
   v_old_from uuid;
   v_old_to uuid;
@@ -69,13 +71,13 @@ BEGIN
     END IF;
 
     SELECT a.opening_balance, a.currency
-      INTO v_opening, v_account
+      INTO v_opening, v_source_currency
     FROM public.accounts a
     WHERE a.id = v_from_id AND a.family_id = v_family_id;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'source account not found';
     END IF;
-    IF v_account.currency <> v_currency THEN
+    IF v_source_currency <> v_currency THEN
       RAISE EXCEPTION 'source account currency mismatch';
     END IF;
 
@@ -111,8 +113,8 @@ BEGIN
       RAISE EXCEPTION 'destination account not found';
     END IF;
     IF v_destination_amount IS NULL OR v_destination_amount<=0 THEN
-      SELECT a.currency INTO v_account FROM public.accounts a WHERE a.id=v_to_id AND a.family_id=v_family_id;
-      IF v_account.currency <> v_currency THEN
+      SELECT a.currency INTO v_destination_currency FROM public.accounts a WHERE a.id=v_to_id AND a.family_id=v_family_id;
+      IF v_destination_currency <> v_currency THEN
         RAISE EXCEPTION 'destination amount is required for cross-currency transfer';
       END IF;
       v_destination_amount := v_amount;
