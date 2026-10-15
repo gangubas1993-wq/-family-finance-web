@@ -177,8 +177,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=(n,c)=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(Number(n||0))+" "+c;
 const dateKey=s=>{if(!s)return"";const p=s.split(".");return p.length===3?p[2]+"-"+p[1]+"-"+p[0]:s};
-const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};function card(l,v,s){return'<div class="card"><div class="label">'+esc(l)+'</div><div class="value">'+esc(v)+'</div><div class="sub">'+esc(s||"")+'</div></div>'}
-function detectRole(){
+const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};function card(l,v,s){return'<div class="card"><div class="label">'+esc(l)+'</div><div class="value">'+esc(v)+'</div><div class="sub">'+esc(s||"")+'</div></div>'}function detectRole(){
   try{
     const token=localStorage.getItem("ff_token")||"";
     const parts=token.split(".");
@@ -357,8 +356,7 @@ async function saveCategory(){try{$("categoryFormError").classList.add("hidden")
 async function toggleCategory(id){const x=(DATA?.categoryStructure||[]).find(a=>a.id===id);if(!x)return;if(!confirm((x.is_active===false?"Включить":"Отключить")+" категорию «"+x.name+"»?"))return;try{await api("/category/toggle",{method:"POST",body:JSON.stringify({id})});await load()}catch(e){alert(e.message)}}
 function fillAliasCategories(selected){$("alCategory").innerHTML=(DATA?.categoryStructure||[]).filter(x=>x.is_active!==false).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");if(selected)$("alCategory").value=selected}
 function openAliasCreate(categoryId){currentAliasId=null;$("aliasModalLabel").textContent="Новый синоним";$("aliasModalTitle").textContent="Синоним";$("alName").value="";fillAliasCategories(categoryId);$("aliasFormError").classList.add("hidden");$("aliasModal").classList.add("open")}function openAliasEdit(id){const x=(DATA?.topAliases||[]).find(a=>a.id===id);if(!x)return;currentAliasId=id;$("aliasModalLabel").textContent="Редактирование";$("aliasModalTitle").textContent=x.alias;$("alName").value=x.alias;fillAliasCategories(x.category_id);$("aliasFormError").classList.add("hidden");$("aliasModal").classList.add("open")}
-function closeAliasModal(e){if(e&&e.target!==$("aliasModal"))return;$("aliasModal").classList.remove("open")}
-async function saveAlias(){try{$("aliasFormError").classList.add("hidden");const body={id:currentAliasId,alias:$("alName").value.trim(),category_id:$("alCategory").value};await api(currentAliasId?"/alias/update":"/alias/create",{method:"POST",body:JSON.stringify(body)});closeAliasModal();await load()}catch(e){$("aliasFormError").textContent=e.message;$("aliasFormError").classList.remove("hidden")}}
+function closeAliasModal(e){if(e&&e.target!==$("aliasModal"))return;$("aliasModal").classList.remove("open")}async function saveAlias(){try{$("aliasFormError").classList.add("hidden");const body={id:currentAliasId,alias:$("alName").value.trim(),category_id:$("alCategory").value};await api(currentAliasId?"/alias/update":"/alias/create",{method:"POST",body:JSON.stringify(body)});closeAliasModal();await load()}catch(e){$("aliasFormError").textContent=e.message;$("aliasFormError").classList.remove("hidden")}}
 async function toggleAlias(id){const x=(DATA?.topAliases||[]).find(a=>a.id===id);if(!x)return;if(!confirm((x.is_active===false?"Включить":"Отключить")+" синоним «"+x.alias+"»?"))return;try{await api("/alias/toggle",{method:"POST",body:JSON.stringify({id})});await load()}catch(e){alert(e.message)}}
 
 let currentAccountId=null;
@@ -400,7 +398,8 @@ async function saveOperation(){
  try{
   $("formError").classList.add("hidden");updateBalanceWarning();
   const historical=ROLE==="owner"&&$("historicalMode").checked;
-  if(!$("balanceWarning").classList.contains("hidden")&&!historical&&!isMetadataOnlyEdit())throw new Error($("balanceWarning").textContent);
+  // The live balance warning already explains why saving is blocked; do not duplicate it in formError.
+  if(!$("balanceWarning").classList.contains("hidden")&&!historical&&!isMetadataOnlyEdit())return;
   const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim(),historical_mode:historical};
   if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}
   else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}
