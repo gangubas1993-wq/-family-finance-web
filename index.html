@@ -29,10 +29,16 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div id="login" class="login">
 <h1>Семейные финансы</h1><div class="muted">Веб-интерфейс</div>
 <form method="post" action="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api/login">
+<label for="loginRole" class="muted" style="display:block;margin:18px 0 6px">Кто входит?</label>
+<select name="role" id="loginRole" required style="width:100%;padding:13px 14px;border:1px solid #cfd6dc;border-radius:12px;margin:0 0 12px;background:#fff">
+<option value="owner">Данил — владелец</option>
+<option value="member">Мария — участник семьи</option>
+</select>
+<label for="secret" class="muted" style="display:block;margin:4px 0 6px">Пароль</label>
 <input name="secret" id="secret" type="password" autocomplete="current-password" placeholder="Пароль доступа" required>
 <button class="btn primary" type="submit" style="width:100%">Войти</button>
 </form>
-<div id="loginErr" class="error hidden" style="margin-top:12px">Неверный пароль.</div>
+<div id="loginErr" class="error hidden" style="margin-top:12px">Не удалось войти. Проверьте выбранную учётную запись и пароль.</div>
 </div>
 
 <div id="app" class="hidden">
