@@ -37,4 +37,4 @@ jobs:
       - name: Install PostgreSQL driver
         run: python -m pip install "psycopg[binary]>=3.2,<4"
       - name: Run isolated database guard tests
-        run: python -m unittest -v tests.server_balance_guard_test
+        run: python tests/server_balance_guard_test.py
