@@ -106,6 +106,7 @@ try {
   assert.match(await owner.page.locator("#balanceWarning").innerText(), /Недостаточно средств/);
   await owner.page.locator("#historicalMode").check();
   await owner.page.locator("#modal button[onclick=" + '"saveOperation()"' + "]").click();
+  await owner.page.waitForFunction(() => document.querySelector("#formError")?.innerText.includes("Запись запрещена изолированным тестом"), null, { timeout: 5000 });
   assert.equal(owner.interceptedWrites.length, 1, "историческая операция должна дойти до серверной проверки");
   assert.match(await owner.page.locator("#formError").innerText(), /Запись запрещена изолированным тестом/);
   assert.doesNotMatch(await owner.page.locator("#formError").innerText(), /Недостаточно средств/);
