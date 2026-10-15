@@ -172,7 +172,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 </script>
 <script>
 const API="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api";
-let DATA=null,currentId=null,ROLE="member";
+let DATA=null,currentId=null,ROLE="member",EDIT_BASELINE=null;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=(n,c)=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(Number(n||0))+" "+c;
@@ -313,15 +313,19 @@ function calcTransferCurrency(){
   }
 }
 function isMetadataOnlyEdit(){
- if(!currentId||!DATA)return false;
- const old=(DATA.operations||[]).find(o=>o.id===currentId);
- if(!old)return false;
- const type=$("oType").value, amount=Number($("oAmount").value), currency=$("oCurrency").value;
- if(type!==old.type||amount!==Number(old.amount)||currency!==old.currency||dateKey($("oDate").value)!==dateKey(old.date))return false;
- if(type==="expense")return $("oAccount").value===old.from_account_id && $("oCategory").value===(old.category_id||"");
- if(type==="income")return $("oAccount").value===old.to_account_id && $("oCategory").value===(old.category_id||"");
- if(type==="transfer")return $("oFrom").value===old.from_account_id && $("oTo").value===old.to_account_id && (Number($("oDestinationAmount").value)||0)===(Number(old.destination_amount)||0) && (Number($("oExchangeRate").value)||0)===(Number(old.exchange_rate)||0);
- return false;
+ const b=EDIT_BASELINE;
+ if(!currentId||!b||b.id!==currentId)return false;
+ const dateValue=$("oDate").value||"";
+ return $("oType").value===b.type &&
+  Number($("oAmount").value)===b.amount &&
+  $("oCurrency").value===b.currency &&
+  dateValue===b.date &&
+  (b.type==="transfer"
+    ? $("oFrom").value===b.from_account_id && $("oTo").value===b.to_account_id &&
+      (Number($("oDestinationAmount").value)||null)===b.destination_amount &&
+      (Number($("oExchangeRate").value)||null)===b.exchange_rate
+    : $("oAccount").value===(b.type==="expense"?b.from_account_id:b.to_account_id) &&
+      ($("oCategory").value||"")===b.category_id);
 }
 function updateBalanceWarning(){
  const historical=$("historicalModeWrap");
@@ -397,8 +401,8 @@ async function toggleAccount(id){
   catch(e){alert(e.message)}
 }
 
-function openCreate(){currentId=null;$("historicalMode").checked=false;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";$("oDestinationAmount").value="";$("oExchangeRate").value="";refreshForm();$("formError").classList.add("hidden");updateBalanceWarning();$("modal").classList.add("open")}
-function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;$("historicalMode").checked=ROLE==="owner"&&o.historical_mode===true;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.toggle("hidden",ROLE!=="owner");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id;$("oDestinationAmount").value=o.destination_amount??"";$("oExchangeRate").value=o.exchange_rate??""},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
+function openCreate(){currentId=null;EDIT_BASELINE=null;$("historicalMode").checked=false;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";$("oDestinationAmount").value="";$("oExchangeRate").value="";refreshForm();$("formError").classList.add("hidden");updateBalanceWarning();$("modal").classList.add("open")}
+function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;EDIT_BASELINE={id:o.id,type:o.type,amount:Number(o.amount),currency:o.currency,date:dateKey(o.date),account_id:o.account_id||"",from_account_id:o.from_account_id||"",to_account_id:o.to_account_id||"",category_id:o.category_id||"",destination_amount:o.destination_amount==null?null:Number(o.destination_amount),exchange_rate:o.exchange_rate==null?null:Number(o.exchange_rate)};$("historicalMode").checked=ROLE==="owner"&&o.historical_mode===true;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.toggle("hidden",ROLE!=="owner");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id;$("oDestinationAmount").value=o.destination_amount??"";$("oExchangeRate").value=o.exchange_rate??""},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
 function closeModal(e){if(e&&e.target!==$("modal"))return;$("modal").classList.remove("open")}
 async function saveOperation(){try{$("formError").classList.add("hidden");updateBalanceWarning();const historical=ROLE==="owner"&&$("historicalMode").checked;if(!$("balanceWarning").classList.contains("hidden")&&!historical&&!isMetadataOnlyEdit())throw new Error($("balanceWarning").textContent);const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim(),historical_mode:historical};if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}else{body.account_from_id=$("oFrom").value;body.account_to_id=$("oTo").value;const destination=Number($("oDestinationAmount").value)||0;const rate=Number($("oExchangeRate").value)||0;body.destination_amount=destination||undefined;body.exchange_rate=rate||undefined}
 await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
