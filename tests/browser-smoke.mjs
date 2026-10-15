@@ -88,7 +88,8 @@ try {
   await member.page.locator("#oAmount").fill("10");
   assert.match(await member.page.locator("#balanceWarning").innerText(), /Недостаточно средств/);
   await member.page.locator("#modal button[onclick=" + '"saveOperation()"' + "]").click();
-  assert.match(await member.page.locator("#formError").innerText(), /Недостаточно средств/);
+  assert.match(await member.page.locator("#balanceWarning").innerText(), /Недостаточно средств/);
+  assert.equal(await member.page.locator("#formError").innerText(), "", "повторное предупреждение не должно дублироваться в ошибке формы");
   assert.equal(member.interceptedWrites.length, 0, "операция с недостаточным балансом не должна отправляться");
   results.push("PASS: участник, баланс 0, блокировка расхода до API");
   await member.context.close();
