@@ -18,9 +18,14 @@ CREATE TABLE guard_test.accounts (
 CREATE TABLE guard_test.transactions (
     id bigserial PRIMARY KEY,
     account_id integer NOT NULL REFERENCES guard_test.accounts(id),
-    amount numeric(14,2) NOT NULL CHECK (amount > 0)
+    amount numeric(14,2) NOT NULL CHECK (amount > 0),
+    source text NOT NULL DEFAULT 'web'
 );
-CREATE OR REPLACE FUNCTION guard_test.try_expense(p_account_id integer, p_amount numeric)
+CREATE OR REPLACE FUNCTION guard_test.try_expense(
+    p_account_id integer,
+    p_amount numeric,
+    p_source text DEFAULT 'web'
+)
 RETURNS boolean
 LANGUAGE plpgsql
 AS $$
@@ -33,7 +38,14 @@ BEGIN
         RAISE EXCEPTION 'amount must be positive';
     END IF;
 
-    -- Serializes all spending attempts for this account.
+    -- Explicit history / Telegram force paths are deliberate, recorded exceptions.
+    IF p_source IN ('web_history', 'telegram_force') THEN
+        INSERT INTO guard_test.transactions(account_id, amount, source)
+        VALUES (p_account_id, p_amount, p_source);
+        RETURN true;
+    END IF;
+
+    -- Serialize spending attempts for this account to avoid check-then-insert races.
     SELECT opening_balance INTO v_opening
     FROM guard_test.accounts
     WHERE id = p_account_id
@@ -52,8 +64,8 @@ BEGIN
         RAISE EXCEPTION 'insufficient funds: available %, requested %', v_balance, p_amount;
     END IF;
 
-    INSERT INTO guard_test.transactions(account_id, amount)
-    VALUES (p_account_id, p_amount);
+    INSERT INTO guard_test.transactions(account_id, amount, source)
+    VALUES (p_account_id, p_amount, p_source);
     RETURN true;
 END;
 $$;
@@ -84,12 +96,12 @@ class AtomicBalanceGuardTests(unittest.TestCase):
             """).fetchone()
             return row[0], row[1]
 
-    def attempt(self, amount, barrier=None):
+    def attempt(self, amount, barrier=None, source="web"):
         try:
             with psycopg.connect(DSN) as conn:
                 if barrier:
                     barrier.wait(timeout=5)
-                conn.execute("SELECT guard_test.try_expense(1, %s)", (amount,))
+                conn.execute("SELECT guard_test.try_expense(1, %s, %s)", (amount, source))
             return "accepted"
         except psycopg.Error as exc:
             return "rejected:" + str(exc).splitlines()[0]
@@ -115,6 +127,20 @@ class AtomicBalanceGuardTests(unittest.TestCase):
         result = self.attempt(0)
         self.assertTrue(result.startswith("rejected:"))
         self.assertEqual(self.balance_and_count(), (100, 0))
+
+    def test_historical_expense_can_create_negative_balance_and_is_tagged(self):
+        self.assertEqual(self.attempt(150, source="web_history"), "accepted")
+        self.assertEqual(self.balance_and_count(), (-50, 1))
+        with psycopg.connect(DSN) as conn:
+            source = conn.execute("SELECT source FROM guard_test.transactions").fetchone()[0]
+        self.assertEqual(source, "web_history")
+
+    def test_telegram_explicit_override_is_recorded_as_exception(self):
+        self.assertEqual(self.attempt(150, source="telegram_force"), "accepted")
+        self.assertEqual(self.balance_and_count(), (-50, 1))
+        with psycopg.connect(DSN) as conn:
+            source = conn.execute("SELECT source FROM guard_test.transactions").fetchone()[0]
+        self.assertEqual(source, "telegram_force")
 
 
 if __name__ == "__main__":
