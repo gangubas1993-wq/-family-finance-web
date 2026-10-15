@@ -101,7 +101,16 @@ try {
   );
   await owner.page.locator("#adminNav").click();
   assert.match(await owner.page.locator("#accounts").innerText(), /Тестовый банк TRY/);
-  results.push("PASS: владелец видит управление и тестовый счёт");
+  await owner.page.locator('button[onclick="openCreate()"]').first().click();
+  await owner.page.locator("#oAmount").fill("10");
+  assert.match(await owner.page.locator("#balanceWarning").innerText(), /Недостаточно средств/);
+  await owner.page.locator("#historicalMode").check();
+  await owner.page.locator("#modal button[onclick=" + '"saveOperation()"' + "]").click();
+  await owner.page.waitForFunction(() => document.querySelector("#formError")?.innerText.includes("Запись запрещена изолированным тестом"), null, { timeout: 5000 });
+  assert.equal(owner.interceptedWrites.length, 1, "историческая операция должна дойти до серверной проверки");
+  assert.match(await owner.page.locator("#formError").innerText(), /Запись запрещена изолированным тестом/);
+  assert.doesNotMatch(await owner.page.locator("#formError").innerText(), /Недостаточно средств/);
+  results.push("PASS: владелец может отправить историческую операцию с предупреждением; запрос остаётся изолированным");
   await owner.context.close();
 
   const mobile = await openIsolatedPage("member", { width: 390, height: 844 });
