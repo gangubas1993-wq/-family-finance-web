@@ -313,15 +313,9 @@ function calcTransferCurrency(){
   }
 }
 function isMetadataOnlyEdit(){
- const b=EDIT_BASELINE;
- if(!currentId||!b||b.id!==currentId||ROLE!=="member"||b.source!=="web_history")return false;
- const type=$("oType").value, currency=$("oCurrency").value;
- if(type!==b.type||currency!==b.currency)return false;
- if(type==="transfer")return $("oFrom").value===b.from_account_id&&$("oTo").value===b.to_account_id&&
-  (Number($("oDestinationAmount").value)||null)===b.destination_amount&&
-  (Number($("oExchangeRate").value)||null)===b.exchange_rate;
- return $("oAccount").value===(type==="expense"?b.from_account_id:b.to_account_id)&&
-  ($("oCategory").value||"")===b.category_id;
+ // For existing member edits, let the server's atomic balance guard decide.
+ // This does not grant operation deletion or account/category administration.
+ return !!(currentId&&EDIT_BASELINE&&EDIT_BASELINE.id===currentId&&ROLE==="member");
 }
 function updateBalanceWarning(){
  const historical=$("historicalModeWrap");
