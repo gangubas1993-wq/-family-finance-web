@@ -15,7 +15,7 @@ required = {
     "HTTPS dashboard API": 'const API="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api"' in html,
     "fail-closed default role": 'ROLE="member"' in html,
     "balance warning function": "function updateBalanceWarning()" in html,
-    "existing-operation comment edits bypass client balance warning only when financial fields unchanged": '&&!historical&&!isMetadataOnlyEdit())throw new Error' in html and "function isMetadataOnlyEdit()" in html,
+    "member edits defer balance validation to the server guard": '&&!historical&&!isMetadataOnlyEdit())throw new Error' in html and "function isMetadataOnlyEdit()" in html and "server's atomic balance guard" in html,
     "historical mode is owner-only and sent explicitly": 'historical_mode:historical' in html and 'ROLE==="owner"&&$("historicalMode").checked' in html,
     "operation save handler": "async function saveOperation()" in html,
     "login token stored across tab suspension": 'localStorage.setItem("ff_token",token)' in html,
