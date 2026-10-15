@@ -15,10 +15,10 @@ required = {
     "HTTPS dashboard API": 'const API="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api"' in html,
     "fail-closed default role": 'ROLE="member"' in html,
     "balance warning function": "function updateBalanceWarning()" in html,
-    "save blocks on balance warning unless explicit owner history mode is selected": 'if(!$("balanceWarning").classList.contains("hidden")&&!historical)throw new Error' in html,
+    "existing-operation comment edits bypass client balance warning only when financial fields unchanged": '&&!historical&&!isMetadataOnlyEdit())throw new Error' in html and "function isMetadataOnlyEdit()" in html,
     "historical mode is owner-only and sent explicitly": 'historical_mode:historical' in html and 'ROLE==="owner"&&$("historicalMode").checked' in html,
     "operation save handler": "async function saveOperation()" in html,
-    "login token stored for session": 'sessionStorage.setItem("ff_token", token)' in html,
+    "login token stored across tab suspension": 'localStorage.setItem("ff_token",token)' in html,
     "URL cleaned after token capture": "history.replaceState" in html,
     "owner-only admin UI": 'adminNav.classList.toggle("hidden",ROLE!=="owner")' in html,
 }
