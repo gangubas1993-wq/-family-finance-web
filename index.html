@@ -146,7 +146,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="formgrid"><div class="field"><label>Сумма зачисления</label><input id="oDestinationAmount" type="number" min="0" step="0.01" placeholder="Посчитается автоматически" oninput="calcTransferFrom('destination')"></div><div class="field"><label>Курс сделки</label><input id="oExchangeRate" type="number" min="0" step="0.00000001" placeholder="Посчитается автоматически" oninput="calcTransferFrom('rate')"></div></div><div class="muted" style="margin-top:7px">Введи любые <b>два из трёх</b>: сколько отдал, сколько получил, курс. Третье значение посчитается автоматически.</div>
 </div>
 <div class="field"><label>Комментарий</label><textarea id="oComment" rows="3" placeholder="Например: продукты, бензин, зарплата..."></textarea></div>
-<div class="form-actions"><div><button id="deleteBtn" class="btn danger hidden" onclick="deleteCurrent()">Удалить</button></div><div class="right-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn primary" onclick="saveOperation()">Сохранить</button></div></div>
+<div class="form-actions"><div><button id="deleteBtn" class="btn danger hidden" onclick="deleteCurrent()">Удалить</button></div><div class="right-actions"><button class="btn" onclick="closeModal()">Отмена</button><button class="btn primary" id="saveOperationBtn" onclick="saveOperation()">Сохранить</button></div></div>
 </div></div>
 
 <script>
@@ -172,13 +172,12 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 </script>
 <script>
 const API="https://txebmzeyoqauitiyykto.supabase.co/functions/v1/family-finance-dashboard-api";
-let DATA=null,currentId=null,ROLE="member",EDIT_BASELINE=null;
+let DATA=null,currentId=null,ROLE="member",EDIT_BASELINE=null,SAVE_OPERATION_BUSY=false;
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt=(n,c)=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(Number(n||0))+" "+c;
 const dateKey=s=>{if(!s)return"";const p=s.split(".");return p.length===3?p[2]+"-"+p[1]+"-"+p[0]:s};
-const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};
-function card(l,v,s){return'<div class="card"><div class="label">'+esc(l)+'</div><div class="value">'+esc(v)+'</div><div class="sub">'+esc(s||"")+'</div></div>'}
+const today=()=>{const d=new Date();return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10)};function card(l,v,s){return'<div class="card"><div class="label">'+esc(l)+'</div><div class="value">'+esc(v)+'</div><div class="sub">'+esc(s||"")+'</div></div>'}
 function detectRole(){
   try{
     const token=localStorage.getItem("ff_token")||"";
@@ -357,8 +356,7 @@ function closeCategoryModal(e){if(e&&e.target!==$("categoryModal"))return;$("cat
 async function saveCategory(){try{$("categoryFormError").classList.add("hidden");const body={id:currentCategoryId,name:$("cName").value.trim(),kind:$("cKind").value};await api(currentCategoryId?"/category/update":"/category/create",{method:"POST",body:JSON.stringify(body)});closeCategoryModal();await load()}catch(e){$("categoryFormError").textContent=e.message;$("categoryFormError").classList.remove("hidden")}}
 async function toggleCategory(id){const x=(DATA?.categoryStructure||[]).find(a=>a.id===id);if(!x)return;if(!confirm((x.is_active===false?"Включить":"Отключить")+" категорию «"+x.name+"»?"))return;try{await api("/category/toggle",{method:"POST",body:JSON.stringify({id})});await load()}catch(e){alert(e.message)}}
 function fillAliasCategories(selected){$("alCategory").innerHTML=(DATA?.categoryStructure||[]).filter(x=>x.is_active!==false).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");if(selected)$("alCategory").value=selected}
-function openAliasCreate(categoryId){currentAliasId=null;$("aliasModalLabel").textContent="Новый синоним";$("aliasModalTitle").textContent="Синоним";$("alName").value="";fillAliasCategories(categoryId);$("aliasFormError").classList.add("hidden");$("aliasModal").classList.add("open")}
-function openAliasEdit(id){const x=(DATA?.topAliases||[]).find(a=>a.id===id);if(!x)return;currentAliasId=id;$("aliasModalLabel").textContent="Редактирование";$("aliasModalTitle").textContent=x.alias;$("alName").value=x.alias;fillAliasCategories(x.category_id);$("aliasFormError").classList.add("hidden");$("aliasModal").classList.add("open")}
+function openAliasCreate(categoryId){currentAliasId=null;$("aliasModalLabel").textContent="Новый синоним";$("aliasModalTitle").textContent="Синоним";$("alName").value="";fillAliasCategories(categoryId);$("aliasFormError").classList.add("hidden");$("aliasModal").classList.add("open")}function openAliasEdit(id){const x=(DATA?.topAliases||[]).find(a=>a.id===id);if(!x)return;currentAliasId=id;$("aliasModalLabel").textContent="Редактирование";$("aliasModalTitle").textContent=x.alias;$("alName").value=x.alias;fillAliasCategories(x.category_id);$("aliasFormError").classList.add("hidden");$("aliasModal").classList.add("open")}
 function closeAliasModal(e){if(e&&e.target!==$("aliasModal"))return;$("aliasModal").classList.remove("open")}
 async function saveAlias(){try{$("aliasFormError").classList.add("hidden");const body={id:currentAliasId,alias:$("alName").value.trim(),category_id:$("alCategory").value};await api(currentAliasId?"/alias/update":"/alias/create",{method:"POST",body:JSON.stringify(body)});closeAliasModal();await load()}catch(e){$("aliasFormError").textContent=e.message;$("aliasFormError").classList.remove("hidden")}}
 async function toggleAlias(id){const x=(DATA?.topAliases||[]).find(a=>a.id===id);if(!x)return;if(!confirm((x.is_active===false?"Включить":"Отключить")+" синоним «"+x.alias+"»?"))return;try{await api("/alias/toggle",{method:"POST",body:JSON.stringify({id})});await load()}catch(e){alert(e.message)}}
@@ -394,8 +392,28 @@ async function toggleAccount(id){
 function openCreate(){currentId=null;EDIT_BASELINE=null;$("historicalMode").checked=false;$("modalLabel").textContent="Новая операция";$("deleteBtn").classList.add("hidden");$("oType").value="expense";$("oAmount").value="";$("oCurrency").value="TRY";$("oDate").value=today();$("oComment").value="";$("oDestinationAmount").value="";$("oExchangeRate").value="";refreshForm();$("formError").classList.add("hidden");updateBalanceWarning();$("modal").classList.add("open")}
 function openEdit(id){const o=(DATA.operations||[]).find(x=>x.id===id);if(!o)return;EDIT_BASELINE={id:o.id,type:o.type,amount:Number(o.amount),currency:o.currency,date:dateKey(o.date),source:o.source||"",account_id:o.account_id||"",from_account_id:o.from_account_id||"",to_account_id:o.to_account_id||"",category_id:o.category_id||"",destination_amount:o.destination_amount==null?null:Number(o.destination_amount),exchange_rate:o.exchange_rate==null?null:Number(o.exchange_rate)};$("historicalMode").checked=ROLE==="owner"&&o.historical_mode===true;currentId=o.id;$("modalLabel").textContent="Редактирование";$("deleteBtn").classList.toggle("hidden",ROLE!=="owner");$("oType").value=o.type;$("oAmount").value=o.amount;$("oCurrency").value=o.currency;$("oDate").value=dateKey(o.date);$("oComment").value=o.comment||"";refreshForm();if(o.type==="transfer"){setTimeout(()=>{$("oFrom").value=o.from_account_id;$("oTo").value=o.to_account_id;$("oDestinationAmount").value=o.destination_amount??"";$("oExchangeRate").value=o.exchange_rate??""},0)}else{$("oAccount").value=o.account_id;$("oCategory").value=o.category_id||""}$("formError").classList.add("hidden");$("modal").classList.add("open")}
 function closeModal(e){if(e&&e.target!==$("modal"))return;$("modal").classList.remove("open")}
-async function saveOperation(){try{$("formError").classList.add("hidden");updateBalanceWarning();const historical=ROLE==="owner"&&$("historicalMode").checked;if(!$("balanceWarning").classList.contains("hidden")&&!historical&&!isMetadataOnlyEdit())throw new Error($("balanceWarning").textContent);const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim(),historical_mode:historical};if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}else{body.account_from_id=$("oFrom").value;body.account_to_id=$("oTo").value;const destination=Number($("oDestinationAmount").value)||0;const rate=Number($("oExchangeRate").value)||0;body.destination_amount=destination||undefined;body.exchange_rate=rate||undefined}
-await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
+async function saveOperation(){
+ if(SAVE_OPERATION_BUSY)return;
+ SAVE_OPERATION_BUSY=true;
+ const btn=$("saveOperationBtn"),originalText=btn?.textContent||"Сохранить";
+ if(btn){btn.disabled=true;btn.textContent="Сохранение…";btn.setAttribute("aria-busy","true")}
+ try{
+  $("formError").classList.add("hidden");updateBalanceWarning();
+  const historical=ROLE==="owner"&&$("historicalMode").checked;
+  if(!$("balanceWarning").classList.contains("hidden")&&!historical&&!isMetadataOnlyEdit())throw new Error($("balanceWarning").textContent);
+  const type=$("oType").value,body={id:currentId,type,amount:Number($("oAmount").value),currency:$("oCurrency").value,occurred_at:$("oDate").value?$("oDate").value+"T12:00:00+03:00":new Date().toISOString(),comment:$("oComment").value.trim(),historical_mode:historical};
+  if(type==="expense"){body.account_from_id=$("oAccount").value;body.category_id=$("oCategory").value}
+  else if(type==="income"){body.account_to_id=$("oAccount").value;body.category_id=$("oCategory").value}
+  else{body.account_from_id=$("oFrom").value;body.account_to_id=$("oTo").value;const destination=Number($("oDestinationAmount").value)||0;const rate=Number($("oExchangeRate").value)||0;body.destination_amount=destination||undefined;body.exchange_rate=rate||undefined}
+  await api(currentId?"/operation/update":"/operation/create",{method:"POST",body:JSON.stringify(body)});
+  closeModal();await load();
+ }catch(e){
+  $("formError").textContent=e.message;$("formError").classList.remove("hidden");
+ }finally{
+  SAVE_OPERATION_BUSY=false;
+  if(btn){btn.disabled=false;btn.textContent=originalText;btn.removeAttribute("aria-busy")}
+ }
+}
 async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить операцию?"))return;try{await api("/operation/delete",{method:"POST",body:JSON.stringify({id:currentId})});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
 function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
 function showView(view){
