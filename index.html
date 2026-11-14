@@ -272,7 +272,7 @@ $("aliasList").innerHTML=(d.topAliases||[]).map(x=>'<div class="struct-cat" styl
 document.querySelectorAll("[data-alias-edit]").forEach(b=>b.addEventListener("click",()=>openAliasEdit(b.dataset.aliasEdit)));
 document.querySelectorAll("[data-alias-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAlias(b.dataset.aliasToggle)));
 renderRecurring(d);}
-function fillFilters(d){$("fAccount").innerHTML='<option value="">Все счета</option>'+(d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");$("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+"</option>").join("");["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).oninput=renderOps)}
+function fillFilters(d){const keep={fAccount:$("fAccount").value,fCategory:$("fCategory").value};$("fAccount").innerHTML='<option value="">Все счета</option>'+(d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");$("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+"</option>").join("");$("fAccount").value=keep.fAccount;$("fCategory").value=keep.fCategory;["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).oninput=renderOps)}
 function filteredOps(){const type=$("fType").value,currency=$("fCurrency").value,account=$("fAccount").value,category=$("fCategory").value,from=$("fFrom").value,to=$("fTo").value,search=$("fSearch").value.trim().toLowerCase();return(DATA?.operations||[]).filter(o=>{const d=dateKey(o.date);if(type&&o.type!==type)return false;if(currency&&o.currency!==currency)return false;if(account&&o.account_id!==account&&o.from_account_id!==account&&o.to_account_id!==account)return false;if(category&&o.category_id!==category)return false;if(from&&d<from)return false;if(to&&d>to)return false;if(search&&!([o.date,o.type,o.currency,o.category,o.account,o.from,o.to,o.comment].join(" ").toLowerCase().includes(search)))return false;return true})}
 function renderOps(){
  const os=filteredOps();
@@ -280,10 +280,27 @@ function renderOps(){
  $("ops").innerHTML=os.map(o=>{
    const typ=o.type==="expense"?'<span class="bad">Расход</span>':o.type==="income"?'<span class="good">Доход</span>':"Перевод";
    const amount=(o.type==="expense"?"−":o.type==="income"?"+":"")+fmt(o.amount,o.currency)+(o.type==="transfer"&&o.destination_amount!=null?" → "+fmt(o.destination_amount,o.to_currency||""):""); const rate=o.type==="transfer"&&o.exchange_rate!=null?String(Number(o.exchange_rate).toFixed(8)).replace(/0+$/,"").replace(/\\.$/,"")+" "+esc(o.to_currency||"")+"/"+esc(o.currency):"—";
-   const target=o.type==="transfer"?esc((o.from||"—")+" → "+(o.to||"—")):esc(o.category||"Без категории");
-   return '<tr><td>'+esc(o.date)+'</td><td>'+typ+'</td><td>'+esc(amount)+'</td><td>'+esc(rate)+'</td><td>'+target+'</td><td>'+esc(o.account||"")+'</td><td>'+esc(o.comment||"")+'</td><td><button class="btn" data-op-id="'+esc(o.id)+'">Изменить</button></td></tr>';
+   const categoryCell=o.type==="transfer"?esc((o.from||"—")+" → "+(o.to||"—")):'<select class="quick-category" data-category-op="'+esc(o.id)+'" aria-label="Категория операции">'+(DATA?.allCategories||[]).filter(c=>c.is_active!==false&&(c.kind==="both"||c.kind===o.type)).map(c=>'<option value="'+esc(c.id)+'"'+(c.id===o.category_id?" selected":"")+'>'+esc(c.name)+'</option>').join("")+'</select>';
+   return '<tr><td>'+esc(o.date)+'</td><td>'+typ+'</td><td>'+esc(amount)+'</td><td>'+esc(rate)+'</td><td>'+categoryCell+'</td><td>'+esc(o.account||"")+'</td><td>'+esc(o.comment||"")+'</td><td><button class="btn" data-op-id="'+esc(o.id)+'">Изменить</button></td></tr>';
  }).join("")||'<tr><td colspan="8" class="muted">По фильтрам ничего не найдено.</td></tr>';
  document.querySelectorAll("[data-op-id]").forEach(btn=>btn.addEventListener("click",()=>openEdit(btn.dataset.opId)));
+ document.querySelectorAll("[data-category-op]").forEach(sel=>sel.addEventListener("change",()=>quickUpdateCategory(sel.dataset.categoryOp,sel.value,sel)));
+}
+async function quickUpdateCategory(id,categoryId,control){
+ const o=(DATA?.operations||[]).find(x=>x.id===id);if(!o||!categoryId)return;
+ const previous=o.category_id||"";control.disabled=true;
+ try{
+  const body={id,type:o.type,amount:Number(o.amount),currency:o.currency,occurred_at:o.occurred_at||dateKey(o.date)+"T12:00:00+03:00",comment:o.comment||"",category_id:categoryId};
+  if(o.type==="expense")body.account_from_id=o.from_account_id||o.account_id;
+  else if(o.type==="income")body.account_to_id=o.to_account_id||o.account_id;
+  else{body.account_from_id=o.from_account_id;body.account_to_id=o.to_account_id;body.destination_amount=o.destination_amount??undefined;body.exchange_rate=o.exchange_rate??undefined;}
+  const selected={};["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(k=>selected[k]=$(k).value);
+  await api("/operation/update",{method:"POST",body:JSON.stringify(body)});
+  await load();
+  Object.entries(selected).forEach(([k,v])=>{if($(k))$(k).value=v});
+  renderOps();
+ }catch(e){control.value=previous;alert("Не удалось изменить категорию: "+e.message)}
+ finally{control.disabled=false}
 }
 function populateAccounts(currency,fromId="",toId=""){const ac=(DATA.accounts||[]).filter(a=>a.currency===currency);$("oAccount").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oFrom").innerHTML=ac.map(a=>'<option value="'+a.id+'">'+esc(a.name)+'</option>').join("");$("oTo").innerHTML=(DATA.accounts||[]).map(a=>'<option value="'+a.id+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");if(fromId)$("oFrom").value=fromId;if(toId)$("oTo").value=toId}
 function populateCategories(type,selected=""){const cs=(DATA.allCategories||[]).filter(c=>c.kind==="both"||c.kind===type);$("oCategory").innerHTML=cs.map(c=>'<option value="'+c.id+'">'+esc(c.name)+'</option>').join("");if(selected)$("oCategory").value=selected}
