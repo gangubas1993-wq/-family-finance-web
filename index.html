@@ -449,7 +449,7 @@ function showView(view){
   }
   window.scrollTo({top:0,behavior:"smooth"});
 }
-$("historicalMode").addEventListener("change",updateBalanceWarning);$("oAmount").addEventListener("input",updateBalanceWarning);$("oAccount").addEventListener("change",updateBalanceWarning);$("oFrom").addEventListener("change",updateBalanceWarning);$("oType").addEventListener("change",updateBalanceWarning);
+$("historicalMode").addEventListener("change",updateBalanceWarning);$("oAmount").addEventListener("input",()=>{calcTransferFrom("amount");updateBalanceWarning()});$("oAccount").addEventListener("change",updateBalanceWarning);$("oFrom").addEventListener("change",()=>{calcTransferCurrency();updateBalanceWarning()});$("oTo").addEventListener("change",calcTransferCurrency);$("oType").addEventListener("change",updateBalanceWarning);
 showView("dashboard");
 initAuth();
 </script></body></html>
