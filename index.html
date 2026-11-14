@@ -15,7 +15,7 @@ main{padding:22px 0 50px}h2{font-size:19px;margin:24px 0 12px}.grid{display:grid
 .accounts{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.account-name{font-weight:750}.pill{display:inline-block;margin-left:6px;padding:3px 8px;border-radius:999px;background:var(--soft);font-size:11px;color:#4e5963}
 .good{color:var(--good);font-weight:750}.bad{color:var(--bad);font-weight:750}.month{grid-template-columns:repeat(auto-fit,minmax(205px,1fr))}
 .filters{display:grid;grid-template-columns:repeat(3,minmax(140px,1fr));gap:8px}.filters input,.filters select,.filters textarea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:10px;background:#fff}
-.filter-actions{grid-column:1/-1;display:flex;gap:8px}.filter-actions input{flex:1}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}
+.filter-actions{grid-column:1/-1;display:flex;gap:8px}.filter-actions input{flex:1}.table-wrap{overflow:auto}.quick-category{max-width:190px;min-width:145px;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--text)}#opPagination .btn:disabled{opacity:.4;cursor:not-allowed}table{width:100%;border-collapse:collapse}
 th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:14px;white-space:nowrap}th{color:var(--muted);font-weight:650}.op-row{cursor:pointer}.op-row:hover{background:#fafbfc}
 .bar{height:9px;background:#e9edf0;border-radius:99px;overflow:hidden;margin-top:7px}.bar span{display:block;height:100%;background:#17212b;border-radius:99px}.barhead{display:flex;justify-content:space-between}
 .structure{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}.structure .value{font-size:22px}.structure-list{display:grid;gap:8px}.struct-cat{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
@@ -64,7 +64,7 @@ th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;font-
 <div class="filter-actions"><input id="fSearch" placeholder="Поиск по операции..."><button class="btn" onclick="clearFilters()">Сбросить</button></div>
 </div>
 <div class="table-wrap" style="margin-top:14px"><table><thead><tr><th>Дата</th><th>Тип</th><th>Сумма</th><th>Курс</th><th>Категория / перевод</th><th>Счёт</th><th>Комментарий</th><th>Действия</th></tr></thead><tbody id="ops"></tbody></table></div>
-<div class="muted" id="opCount" style="margin-top:10px"></div>
+<div class="muted" id="opCount" style="margin-top:10px"></div><div id="opPagination" class="actions" style="align-items:center;justify-content:flex-end;margin-top:12px"></div>
 </div>
 <div class="note" style="margin-top:18px">Telegram остаётся быстрым способом ввода. Web позволяет добавлять и редактировать операции.</div>
 </div>
@@ -272,11 +272,16 @@ $("aliasList").innerHTML=(d.topAliases||[]).map(x=>'<div class="struct-cat" styl
 document.querySelectorAll("[data-alias-edit]").forEach(b=>b.addEventListener("click",()=>openAliasEdit(b.dataset.aliasEdit)));
 document.querySelectorAll("[data-alias-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAlias(b.dataset.aliasToggle)));
 renderRecurring(d);}
-function fillFilters(d){const keep={fAccount:$("fAccount").value,fCategory:$("fCategory").value};$("fAccount").innerHTML='<option value="">Все счета</option>'+(d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");$("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+"</option>").join("");$("fAccount").value=keep.fAccount;$("fCategory").value=keep.fCategory;["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).oninput=renderOps)}
+function fillFilters(d){const keep={fAccount:$("fAccount").value,fCategory:$("fCategory").value};$("fAccount").innerHTML='<option value="">Все счета</option>'+(d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");$("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+"</option>").join("");$("fAccount").value=keep.fAccount;$("fCategory").value=keep.fCategory;["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).oninput=()=>{operationPage=1;renderOps()})}
+let operationPage=1;const OPERATIONS_PER_PAGE=50;
 function filteredOps(){const type=$("fType").value,currency=$("fCurrency").value,account=$("fAccount").value,category=$("fCategory").value,from=$("fFrom").value,to=$("fTo").value,search=$("fSearch").value.trim().toLowerCase();return(DATA?.operations||[]).filter(o=>{const d=dateKey(o.date);if(type&&o.type!==type)return false;if(currency&&o.currency!==currency)return false;if(account&&o.account_id!==account&&o.from_account_id!==account&&o.to_account_id!==account)return false;if(category&&o.category_id!==category)return false;if(from&&d<from)return false;if(to&&d>to)return false;if(search&&!([o.date,o.type,o.currency,o.category,o.account,o.from,o.to,o.comment].join(" ").toLowerCase().includes(search)))return false;return true})}
+function changeOperationPage(delta){const total=Math.max(1,Math.ceil(filteredOps().length/OPERATIONS_PER_PAGE));operationPage=Math.min(total,Math.max(1,operationPage+delta));renderOps()}
 function renderOps(){
- const os=filteredOps();
- $("opCount").textContent="Показано: "+os.length+" из "+(DATA?.operations||[]).length;
+ const all=filteredOps(),totalPages=Math.max(1,Math.ceil(all.length/OPERATIONS_PER_PAGE));
+ operationPage=Math.min(operationPage,totalPages);
+ const os=all.slice((operationPage-1)*OPERATIONS_PER_PAGE,operationPage*OPERATIONS_PER_PAGE);
+ $("opCount").textContent="Показано "+(all.length?((operationPage-1)*OPERATIONS_PER_PAGE+1):0)+"–"+Math.min(operationPage*OPERATIONS_PER_PAGE,all.length)+" из "+all.length+" операций";
+ $("opPagination").innerHTML=totalPages>1?'<button class="btn" id="opPrev" '+(operationPage===1?"disabled":"")+' onclick="changeOperationPage(-1)">← Назад</button><span class="muted" style="padding:8px 4px">Страница '+operationPage+' из '+totalPages+'</span><button class="btn" id="opNext" '+(operationPage===totalPages?"disabled":"")+' onclick="changeOperationPage(1)">Далее →</button>':"";
  $("ops").innerHTML=os.map(o=>{
    const typ=o.type==="expense"?'<span class="bad">Расход</span>':o.type==="income"?'<span class="good">Доход</span>':"Перевод";
    const amount=(o.type==="expense"?"−":o.type==="income"?"+":"")+fmt(o.amount,o.currency)+(o.type==="transfer"&&o.destination_amount!=null?" → "+fmt(o.destination_amount,o.to_currency||""):""); const rate=o.type==="transfer"&&o.exchange_rate!=null?String(Number(o.exchange_rate).toFixed(8)).replace(/0+$/,"").replace(/\\.$/,"")+" "+esc(o.to_currency||"")+"/"+esc(o.currency):"—";
