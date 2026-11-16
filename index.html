@@ -224,17 +224,20 @@ async function load(retry=0){
  try{
   $("status").className="status";
   $("status").textContent="Загрузка основных данных...";
+  const analyticsMonthToRestore=selectedAnalyticsMonth||currentAnalyticsMonth();
   const d=await api("/dashboard");
   DATA=d;
   detectRole();
   applyRoleUI();
   render(d);
   $("status").textContent="Данные загружены";
+  loadOperationsPage(true);
+  loadAnalyticsMonth(analyticsMonthToRestore);
   // Дополнительные разделы не должны блокировать основной экран.
   Promise.allSettled([api("/dictionary"),api("/recurring/list")]).then(results=>{
     let changed=false;
     for(const x of results)if(x.status==="fulfilled"){Object.assign(DATA,x.value);changed=true}
-    if(changed)render(DATA);
+    if(changed){const monthToRestore=selectedAnalyticsMonth||currentAnalyticsMonth();render(DATA);loadOperationsPage(true);loadAnalyticsMonth(monthToRestore);}
   });
  }catch(e){
   const msg=String(e&&e.message||e);
@@ -260,8 +263,8 @@ document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("
 document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle)));
 document.querySelectorAll("[data-account-edit]").forEach(b=>b.addEventListener("click",()=>openAccountEdit(b.dataset.accountEdit)));
 document.querySelectorAll("[data-account-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAccount(b.dataset.accountToggle)));
-const m=d.month||{};let mh='<div class="grid month">'+card("Расходы TRY",fmt(m.expense?.TRY,"TRY"),"текущий месяц")+card("Доходы TRY",fmt(m.income?.TRY,"TRY"),"текущий месяц")+card("Расходы RUB",fmt(m.expense?.RUB,"RUB"),"текущий месяц")+card("Доходы RUB",fmt(m.income?.RUB,"RUB"),"текущий месяц")+'</div><div class="card" style="margin-top:14px"><div class="month-chart-head"><div><div class="label">Операции по категориям</div><div class="muted">Текущий месяц · без внутренних переводов</div></div><div class="month-chart-filters"><select id="monthChartType"><option value="expense">Расходы</option><option value="income">Доходы</option></select><select id="monthChartCurrency"><option value="TRY">TRY</option><option value="RUB">RUB</option></select></div></div><div id="monthCategoryChart"></div></div>';$("month").innerHTML=mh;$("monthChartType").onchange=renderMonthCategoryChart;$("monthChartCurrency").onchange=renderMonthCategoryChart;renderMonthCategoryChart();
-fillFilters(d);renderOps();$("structure").innerHTML=(d.structure||[]).map(x=>'<div class="card"><div class="value">'+esc(x.value)+'</div><div class="label">'+esc(x.label)+'</div></div>').join("");$("categoryList").innerHTML=(d.categoryStructure||[]).map(x=>{
+const m=d.month||{};renderMonthPanel(m, currentAnalyticsMonth(), []);
+fillFilters(d);$("structure").innerHTML=(d.structure||[]).map(x=>'<div class="card"><div class="value">'+esc(x.value)+'</div><div class="label">'+esc(x.label)+'</div></div>').join("");$("categoryList").innerHTML=(d.categoryStructure||[]).map(x=>{
   const aliases=(x.aliasDetails||[]).filter(a=>a.is_active);
   return '<div class="struct-cat" style="align-items:flex-start"><div style="min-width:0;flex:1"><div><b>'+esc(x.name)+'</b> <span class="pill">'+esc(x.kind)+'</span> '+(x.is_active===false?'<span class="pill">Отключена</span>':'')+'</div><div class="muted">'+esc(aliases.slice(0,8).map(a=>a.alias).join(", "))+(aliases.length>8?" …":"")+'</div><div class="actions" style="margin-top:9px"><button class="btn" data-cat-edit="'+esc(x.id)+'">Изменить</button><button class="btn" data-cat-toggle="'+esc(x.id)+'">'+(x.is_active===false?"Включить":"Отключить")+'</button><button class="btn" data-alias-add="'+esc(x.id)+'">＋ Синоним</button></div></div><div class="pill">'+esc(String(x.aliasCount||0))+'</div></div>';
 }).join("");
@@ -272,30 +275,149 @@ $("aliasList").innerHTML=(d.topAliases||[]).map(x=>'<div class="struct-cat" styl
 document.querySelectorAll("[data-alias-edit]").forEach(b=>b.addEventListener("click",()=>openAliasEdit(b.dataset.aliasEdit)));
 document.querySelectorAll("[data-alias-toggle]").forEach(b=>b.addEventListener("click",()=>toggleAlias(b.dataset.aliasToggle)));
 renderRecurring(d);}
+
+let selectedAnalyticsMonth="";
+function currentAnalyticsMonth(){
+ const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Istanbul",year:"numeric",month:"2-digit"}).formatToParts(new Date());
+ return (parts.find(p=>p.type==="year")?.value||"2026")+"-"+(parts.find(p=>p.type==="month")?.value||"01");
+}
+function analyticsMonthLabel(key){
+ const [y,m]=key.split("-").map(Number);
+ return new Intl.DateTimeFormat("ru-RU",{month:"long",year:"numeric",timeZone:"Europe/Istanbul"}).format(new Date(Date.UTC(y,m-1,15,12)));
+}
+function renderMonthPanel(m, monthKey, availableMonths){
+ selectedAnalyticsMonth=monthKey;
+ const months=[...new Set(availableMonths||[])].sort().reverse();
+ if(!months.includes(monthKey))months.push(monthKey);
+ months.sort().reverse();
+ DATA.analyticsAvailableMonths=months;
+ const monthIndex=months.indexOf(monthKey);
+ const options=months.map(x=>'<option value="'+esc(x)+'" '+(x===monthKey?'selected':'')+'>'+esc(analyticsMonthLabel(x))+'</option>').join("");
+ const label=analyticsMonthLabel(monthKey);
+ const html='<div class="month-chart-head" style="margin-bottom:12px"><div class="label">Период аналитики</div><div class="month-chart-filters"><button class="btn" id="monthPrev" type="button" '+(monthIndex===months.length-1?'disabled':'')+'>←</button><select id="monthPicker" aria-label="Выбрать месяц">'+options+'</select><button class="btn" id="monthNext" type="button" '+(monthIndex<=0?'disabled':'')+'>→</button></div></div>'+
+ '<div class="grid month">'+card("Расходы TRY",fmt(m.expense?.TRY,"TRY"),label)+card("Доходы TRY",fmt(m.income?.TRY,"TRY"),label)+card("Расходы RUB",fmt(m.expense?.RUB,"RUB"),label)+card("Доходы RUB",fmt(m.income?.RUB,"RUB"),label)+'</div>'+
+ '<div class="card" style="margin-top:14px"><div class="month-chart-head"><div><div class="label">Операции по категориям</div><div class="muted">'+esc(label)+' · внутренние переводы исключены</div></div><div class="month-chart-filters"><select id="monthChartType"><option value="expense">Расходы</option><option value="income">Доходы</option></select><select id="monthChartCurrency"><option value="TRY">TRY</option><option value="RUB">RUB</option></select></div></div><div id="monthCategoryChart"></div></div>';
+ $("month").innerHTML=html;
+ $("monthChartType").onchange=renderMonthCategoryChart;
+ $("monthChartCurrency").onchange=renderMonthCategoryChart;
+ $("monthPicker").onchange=()=>loadAnalyticsMonth($("monthPicker").value);
+ $("monthPrev").onclick=()=>moveAnalyticsMonth(-1);
+ $("monthNext").onclick=()=>moveAnalyticsMonth(1);
+ DATA.month=m;
+ renderMonthCategoryChart();
+}
+function moveAnalyticsMonth(delta){
+ const months=DATA?.analyticsAvailableMonths||[];
+ const index=months.indexOf(selectedAnalyticsMonth);
+ const targetIndex=index-delta;
+ if(index<0||targetIndex<0||targetIndex>=months.length)return;
+ loadAnalyticsMonth(months[targetIndex]);
+}
+async function loadAnalyticsMonth(monthKey){
+ const target=$("month");
+ if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey))return;
+ selectedAnalyticsMonth=monthKey;
+ if(target)target.style.opacity=".55";
+ try{
+  const a=await api("/analytics?month="+encodeURIComponent(monthKey));
+  const totals=a.totals||{};
+  const toAmount=(key)=>Number(totals[key]?.amount||0);
+  const month={
+   expense:{TRY:toAmount("expense_TRY"),RUB:toAmount("expense_RUB")},
+   income:{TRY:toAmount("income_TRY"),RUB:toAmount("income_RUB")},
+   expenseCategories:a.expenseCategories||[],
+   incomeCategories:a.incomeCategories||[]
+  };
+  renderMonthPanel(month,monthKey,a.availableMonths||[]);
+ }catch(e){
+  if(target)target.style.opacity="1";
+  const status=$("status");
+  if(status){status.className="error";status.textContent="Не удалось загрузить аналитику за "+monthKey+": "+String(e.message||e);}
+ }finally{if(target)target.style.opacity="1";}
+}
+
 function renderMonthCategoryChart(){
  const type=$("monthChartType")?.value||"expense",currency=$("monthChartCurrency")?.value||"TRY";
  const month=DATA?.month||{},items=(type==="income"?month.incomeCategories:month.expenseCategories)||[];
  const rows=items.filter(x=>x.currency===currency).sort((a,b)=>Number(b.amount)-Number(a.amount));
  const target=$("monthCategoryChart");if(!target)return;
- if(!rows.length){target.innerHTML='<div class="month-chart-empty">За текущий месяц операций в этой валюте нет.</div>';return}
+ if(!rows.length){target.innerHTML='<div class="month-chart-empty">За выбранный месяц операций в этой валюте нет.</div>';return}
  const max=Math.max(...rows.map(x=>Number(x.amount||0)),1);
- target.innerHTML='<div class="month-columns">'+rows.map(x=>{const v=Number(x.amount||0),h=Math.max(3,Math.round(v/max*100));return '<div class="month-column"><div class="month-column-value">'+esc(fmt(v,currency))+'</div><div class="month-column-track"><div class="month-column-bar" style="height:'+h+'%"></div></div><div class="month-column-name" title="'+esc(x.category)+'">'+esc(x.category)+'</div></div>'}).join("")+'</div>';
+ target.innerHTML='<div class="month-columns">'+rows.map(x=>{const v=Number(x.amount||0),h=Math.max(3,Math.round(v/max*100));return '<div class="month-column" data-month-category="'+esc(x.category_id||"")+'" title="Открыть операции категории" role="button" tabindex="0" style="cursor:pointer"><div class="month-column-value">'+esc(fmt(v,currency))+'</div><div class="month-column-track"><div class="month-column-bar" style="height:'+h+'%"></div></div><div class="month-column-name">'+esc(x.category)+'</div><div class="muted" style="font-size:11px;text-align:center">'+Number(x.operations||0)+' оп.</div></div>'}).join("")+'</div>';
+ target.querySelectorAll("[data-month-category]").forEach(el=>el.addEventListener("click",()=>openAnalyticsCategory(el.dataset.monthCategory,type,currency)));
 }
-function fillFilters(d){const keep={fAccount:$("fAccount").value,fCategory:$("fCategory").value};$("fAccount").innerHTML='<option value="">Все счета</option>'+(d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");$("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(c=>'<option value="'+esc(c.id)+'">'+esc(c.name)+"</option>").join("");$("fAccount").value=keep.fAccount;$("fCategory").value=keep.fCategory;["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).oninput=()=>{operationPage=1;renderOps()})}
-let operationPage=1;const OPERATIONS_PER_PAGE=50;
-function filteredOps(){const type=$("fType").value,currency=$("fCurrency").value,account=$("fAccount").value,category=$("fCategory").value,from=$("fFrom").value,to=$("fTo").value,search=$("fSearch").value.trim().toLowerCase();return(DATA?.operations||[]).filter(o=>{const d=dateKey(o.date);if(type&&o.type!==type)return false;if(currency&&o.currency!==currency)return false;if(account&&o.account_id!==account&&o.from_account_id!==account&&o.to_account_id!==account)return false;if(category&&o.category_id!==category)return false;if(from&&d<from)return false;if(to&&d>to)return false;if(search&&!([o.date,o.type,o.currency,o.category,o.account,o.from,o.to,o.comment].join(" ").toLowerCase().includes(search)))return false;return true})}
-function changeOperationPage(delta){const total=Math.max(1,Math.ceil(filteredOps().length/OPERATIONS_PER_PAGE));operationPage=Math.min(total,Math.max(1,operationPage+delta));renderOps()}
+function openAnalyticsCategory(categoryId,type,currency){
+ if(!categoryId)return;
+ const [year,month]=selectedAnalyticsMonth.split("-").map(Number);
+ const lastDay=new Date(Date.UTC(year,month,0)).getUTCDate();
+ $("fType").value=type;$("fCurrency").value=currency;$("fCategory").value=categoryId;
+ $("fFrom").value=selectedAnalyticsMonth+"-01";
+ $("fTo").value=selectedAnalyticsMonth+"-"+String(lastDay).padStart(2,"0");
+ loadOperationsPage(true).then(()=>{$("ops")?.scrollIntoView({behavior:"smooth",block:"start"})});
+}
+function fillFilters(d){
+ const keep={fAccount:$("fAccount").value,fCategory:$("fCategory").value};
+ $("fAccount").innerHTML='<option value="">Все счета</option>'+(d.allAccounts||d.accounts||[]).map(a=>'<option value="'+esc(a.id)+'">'+esc(a.name)+" · "+esc(a.currency)+"</option>").join("");
+ $("fCategory").innerHTML='<option value="">Все категории</option>'+(d.allCategories||[]).map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join("");
+ $("fAccount").value=keep.fAccount;$("fCategory").value=keep.fCategory;
+ ["fType","fCurrency","fAccount","fCategory","fFrom","fTo"].forEach(id=>$(id).onchange=()=>loadOperationsPage(true));
+ $("fSearch").oninput=()=>{clearTimeout(window.__ffSearchTimer);window.__ffSearchTimer=setTimeout(()=>loadOperationsPage(true),300)};
+}
+let operationPage=1,operationCursors=[null],operationsTotal=0,operationsHasMore=false,operationsLoading=false,operationsRequestId=0;
+const OPERATIONS_PER_PAGE=50;
+async function loadOperationsPage(reset=false){
+ if(reset){operationPage=1;operationCursors=[null]}
+ const requestId=++operationsRequestId;
+ const cursor=operationCursors[operationPage-1]||null;
+ const params=new URLSearchParams({limit:String(OPERATIONS_PER_PAGE)});
+ const map={type:"fType",currency:"fCurrency",account:"fAccount",category:"fCategory",from:"fFrom",to:"fTo",search:"fSearch"};
+ for(const [key,id] of Object.entries(map)){const value=$(id)?.value?.trim();if(value)params.set(key,value)}
+ if(cursor)params.set("cursor",cursor);
+ operationsLoading=true;
+ const count=$("opCount");if(count)count.textContent="Загрузка операций…";
+ try{
+  const result=await api("/operations?"+params.toString());
+  if(requestId!==operationsRequestId)return;
+  DATA.operations=result.items||[];
+  operationsTotal=Number(result.total_count||0);
+  operationsHasMore=Boolean(result.has_more);
+  DATA.operationsPage=result;
+  renderOps();
+ }catch(e){
+  if(requestId!==operationsRequestId)return;
+  if(count)count.textContent="Не удалось загрузить операции: "+String(e.message||e);
+  $("ops").innerHTML='<tr><td colspan="8" class="muted">Ошибка загрузки операций. Попробуйте обновить.</td></tr>';
+  $("opPagination").innerHTML="";
+ }finally{if(requestId===operationsRequestId)operationsLoading=false}
+}
+function changeOperationPage(delta){
+ if(operationsLoading)return;
+ if(delta>0){
+  const next=DATA?.operationsPage?.next_cursor;
+  if(!operationsHasMore||!next)return;
+  operationCursors[operationPage]=next;
+  operationPage++;
+ }else{
+  if(operationPage<=1)return;
+  operationPage--;
+ }
+ loadOperationsPage(false);
+}
 function renderOps(){
- const all=filteredOps(),totalPages=Math.max(1,Math.ceil(all.length/OPERATIONS_PER_PAGE));
- operationPage=Math.min(operationPage,totalPages);
- const os=all.slice((operationPage-1)*OPERATIONS_PER_PAGE,operationPage*OPERATIONS_PER_PAGE);
- $("opCount").textContent="Показано "+(all.length?((operationPage-1)*OPERATIONS_PER_PAGE+1):0)+"–"+Math.min(operationPage*OPERATIONS_PER_PAGE,all.length)+" из "+all.length+" операций";
- $("opPagination").innerHTML=totalPages>1?'<button class="btn" id="opPrev" '+(operationPage===1?"disabled":"")+' onclick="changeOperationPage(-1)">← Назад</button><span class="muted" style="padding:8px 4px">Страница '+operationPage+' из '+totalPages+'</span><button class="btn" id="opNext" '+(operationPage===totalPages?"disabled":"")+' onclick="changeOperationPage(1)">Далее →</button>':"";
+ const os=DATA?.operations||[];
+ const first=operationsTotal?(operationPage-1)*OPERATIONS_PER_PAGE+1:0;
+ const last=Math.min((operationPage-1)*OPERATIONS_PER_PAGE+os.length,operationsTotal);
+ $("opCount").textContent="Показано "+first+"–"+last+" из "+operationsTotal+" операций";
+ const prev=operationPage>1,next=operationsHasMore;
+ $("opPagination").innerHTML=(prev?'<button class="btn" onclick="changeOperationPage(-1)">← Назад</button>':"")+
+ '<span class="muted" style="padding:8px 4px">Страница '+operationPage+'</span>'+
+ (next?'<button class="btn" onclick="changeOperationPage(1)">Далее →</button>':"");
  $("ops").innerHTML=os.map(o=>{
    const typ=o.type==="expense"?'<span class="bad">Расход</span>':o.type==="income"?'<span class="good">Доход</span>':"Перевод";
-   const amount=(o.type==="expense"?"−":o.type==="income"?"+":"")+fmt(o.amount,o.currency)+(o.type==="transfer"&&o.destination_amount!=null?" → "+fmt(o.destination_amount,o.to_currency||""):""); const rate=o.type==="transfer"&&o.exchange_rate!=null?String(Number(o.exchange_rate).toFixed(8)).replace(/0+$/,"").replace(/\\.$/,"")+" "+esc(o.to_currency||"")+"/"+esc(o.currency):"—";
-   const categoryCell=o.type==="transfer"?esc((o.from||"—")+" → "+(o.to||"—")):'<select class="quick-category" data-category-op="'+esc(o.id)+'" aria-label="Категория операции">'+(DATA?.allCategories||[]).filter(c=>c.is_active!==false&&(c.kind==="both"||c.kind===o.type)).map(c=>'<option value="'+esc(c.id)+'"'+(c.id===o.category_id?" selected":"")+'>'+esc(c.name)+'</option>').join("")+'</select>';
-   return '<tr><td>'+esc(o.date)+'</td><td>'+typ+'</td><td>'+esc(amount)+'</td><td>'+esc(rate)+'</td><td>'+categoryCell+'</td><td>'+esc(o.account||"")+'</td><td>'+esc(o.comment||"")+'</td><td><button class="btn" type="button" data-op-id="'+esc(o.id)+'">Изменить</button></td></tr>';
+   const amount=(o.type==="expense"?"−":o.type==="income"?"+":"")+fmt(o.amount,o.currency)+(o.type==="transfer"&&o.destination_amount!=null?" → "+fmt(o.destination_amount,o.to_currency||""):"");
+   const rate=o.type==="transfer"&&o.exchange_rate!=null?String(Number(o.exchange_rate).toFixed(8)).replace(/0+$/,"").replace(/\\.$/,"")+" "+esc(o.to_currency||"")+"/"+esc(o.currency):"—";
+   const categoryCell=o.type==="transfer"?esc((o.from||"—")+" → "+(o.to||"—")):'<select class="quick-category" data-category-op="'+esc(o.id)+'" aria-label="Категория операции">'+(DATA?.allCategories||[]).filter(x=>x.is_active!==false&&(x.kind==="both"||x.kind===o.type)).map(x=>'<option value="'+esc(x.id)+'"'+(x.id===o.category_id?" selected":"")+'>'+esc(x.name)+'</option>').join("")+'</select>';
+   return '<tr><td>'+esc(o.date||dateKey(o.occurred_at))+'</td><td>'+typ+'</td><td>'+esc(amount)+'</td><td>'+esc(rate)+'</td><td>'+categoryCell+'</td><td>'+esc(o.account||"")+'</td><td>'+esc(o.comment||"")+'</td><td><button class="btn" type="button" data-op-id="'+esc(o.id)+'">Изменить</button></td></tr>';
  }).join("")||'<tr><td colspan="8" class="muted">По фильтрам ничего не найдено.</td></tr>';
  document.querySelectorAll("[data-op-id]").forEach(btn=>btn.addEventListener("click",()=>openEdit(btn.dataset.opId)));
  document.querySelectorAll("[data-category-op]").forEach(sel=>sel.addEventListener("change",()=>quickUpdateCategory(sel.dataset.categoryOp,sel.value,sel)));
@@ -312,7 +434,7 @@ async function quickUpdateCategory(id,categoryId,control){
   await api("/operation/update",{method:"POST",body:JSON.stringify(body)});
   await load();
   Object.entries(selected).forEach(([k,v])=>{if($(k))$(k).value=v});
-  renderOps();
+  loadOperationsPage(true);
  }catch(e){control.value=previous;alert("Не удалось изменить категорию: "+e.message)}
  finally{control.disabled=false}
 }
@@ -447,7 +569,7 @@ async function saveOperation(){
  }
 }
 async function deleteCurrent(){if(!currentId)return;if(!confirm("Удалить операцию?"))return;try{await api("/operation/delete",{method:"POST",body:JSON.stringify({id:currentId})});closeModal();await load()}catch(e){$("formError").textContent=e.message;$("formError").classList.remove("hidden")}}
-function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");renderOps()}
+function clearFilters(){["fType","fCurrency","fAccount","fCategory","fFrom","fTo","fSearch"].forEach(id=>$(id).value="");loadOperationsPage(true)}
 function showView(view){
   const dashboard=$("dashboardView"), admin=$("adminView");
   if(view==="admin" && ROLE!=="owner") view="dashboard";
